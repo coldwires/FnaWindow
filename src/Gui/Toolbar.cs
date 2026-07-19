@@ -75,6 +75,10 @@ public sealed class Toolbar : Widget
 
     private ToolButton Add(ToolButton b) { _buttons.Add(b); base.Add(b); return b; }
 
+    /// <summary>Skin-aware UI-text measure, set by the consumer, so text buttons size to the active
+    /// font (a bigger-font skin needs wider buttons). Falls back to a rough estimate if unset.</summary>
+    public Func<string, int>? MeasureText;
+
     public override void Layout()
     {
         int sz = Theme.ToolButtonSize;
@@ -82,14 +86,14 @@ public sealed class Toolbar : Widget
         int x = Bounds.X + 3;
 
         void Place(ToolButton b, int w) { b.Bounds = new Rectangle(x, y, w, sz); x += w + 1; }
+        int TextW(string s) => MeasureText?.Invoke(s) ?? s.Length * 7;
 
         Place(New, sz); Place(Open, sz); Place(Save, sz);
         x += 6; // gap before text buttons
 
-        // Text buttons sized to their label.
-        // Width is estimated here; the font measure is applied in Frame via MeasureText.
-        Place(Build, 92);
-        Place(Run, 54);
+        // Text buttons sized to their label at the active font.
+        Place(Build, TextW(Build.Text ?? "") + 16);
+        Place(Run, 16 + TextW("Run") + 10); // play triangle + "Run" label
     }
 
     public override void Update(InputState input, GameTime t)
