@@ -17,6 +17,13 @@ public sealed class DemoGame : WindowGame
 
     public DemoGame() : base("FnaWindow Demo") { }
 
+    // A software pointer is opt-in; the Demo uses the native OS cursor by default. To use one,
+    // override BuildCursor and swap the PNG to taste, e.g.:
+    //   protected override MouseCursor? BuildCursor()
+    //       => MouseCursor.Load(GraphicsDevice,
+    //           Path.Combine(System.AppContext.BaseDirectory, "Content", "cursors", "block.png"),
+    //           hotspot: new Point(4, 4), scale: 2);
+
     protected override void BuildUi(WindowFrame frame, BitmapFont uiFont)
     {
         _status = new StatusBar { Message = "Ready. Drag the title bar, resize the edges, try the Themes menu" };

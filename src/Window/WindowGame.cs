@@ -26,6 +26,16 @@ public class WindowGame : Game
     protected TitleBar Caption = null!;      // its title bar: drives close/min/max + the drag hit-test
     protected BitmapFont UiFont = null!, UiBoldFont = null!, EditorFont = null!;
 
+    private MouseCursor? _cursor;
+    /// <summary>Software mouse pointer, or null (default) to use the native OS cursor. Assigning a
+    /// non-null cursor hides the OS cursor and draws this sprite at the mouse each frame; set it
+    /// back to null to restore the native cursor. Apps opt in via <see cref="BuildCursor"/>.</summary>
+    protected MouseCursor? Cursor
+    {
+        get => _cursor;
+        set { _cursor = value; IsMouseVisible = value == null; }
+    }
+
     private readonly string _titleText;
     private IntPtr _sdlWindow, _hwnd;
     private bool _borderless, _maximized, _inDraw;
@@ -106,6 +116,14 @@ public class WindowGame : Game
         return (wf, wf.Title);
     }
 
+    /// <summary>
+    /// Supply a software mouse pointer, or null (default) to keep the native OS cursor. Override
+    /// and return a <see cref="MouseCursor"/> loaded from your app's own Content to draw a custom
+    /// pointer. Called once during load. Note: a software pointer replaces the native resize/move
+    /// cursors on the window's edges (resizing still works; the shape hint just doesn't change).
+    /// </summary>
+    protected virtual MouseCursor? BuildCursor() => null;
+
     protected override void LoadContent()
     {
         Batch = new SpriteBatch(GraphicsDevice);
@@ -116,6 +134,10 @@ public class WindowGame : Game
         UiFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_11"));
         UiBoldFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_11_bold"));
         Renderer = new Win31Renderer(GraphicsDevice, Batch, UiFont, UiBoldFont, EditorFont);
+
+        // Optional software pointer. Default is null (native OS cursor); an app opts in by
+        // overriding BuildCursor. The Cursor setter hides the OS cursor when non-null.
+        Cursor = BuildCursor();
 
         Root = new RootDesktop();
         (Frame, Caption) = BuildFrame(UiFont);
@@ -187,6 +209,7 @@ public class WindowGame : Game
                 if (_flashMs > 0)
                     Renderer.Fill(new Rectangle(0, 0, vp.Width, vp.Height),
                         Color.White * (FlashMaxAlpha * (float)(_flashMs / FlashMs)));
+                Cursor?.Draw(Batch, Input.Mouse);   // software pointer sits on top of everything
             }
             finally { Batch.End(); }
             base.Draw(gameTime);
