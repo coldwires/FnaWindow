@@ -279,6 +279,27 @@ Root()?.RequestRedraw();
 
 For example, a token-streaming view calls `Root()?.RequestRedraw()` whenever new data arrives (or every frame while streaming); a focused text field does it so its caret keeps blinking (the built-in `InputDialog` already does). This throttle does not interfere with continuous output: as long as the producing code requests a redraw, every update renders. The loop only idles when the screen is genuinely static.
 
+## Screenshots
+
+`WindowGame.CaptureScreenshot(path = null)` saves a PNG of the current window and plays a white
+flash and a shutter click, the way a phone does. The grab is a clean frame: the flash is drawn
+only to the screen, never into the file. Call it from a menu item or a shortcut:
+
+```csharp
+MenuItemDef.Item("&Save Screenshot", null, () =>
+{
+    var path = CaptureScreenshot();          // returns the path it will write
+    status.Message = "Saved " + Path.GetFileName(path);
+});
+```
+
+With no argument it writes a timestamped file into a `Screenshots/` folder next to the
+executable. The call waits a couple of frames first so a closing menu isn't in the shot. The
+shutter comes from `ShutterSound`, a procedural click generated at runtime; if there's no audio
+device it stays silent instead of failing. For headless or CI capture without the flash or
+sound, set the `FNAWINDOW_SHOT` environment variable to a path and the window saves that file
+and exits after a few frames.
+
 ## Gotchas
 
 - **ASCII-only fonts.** Unicode glyphs render as blanks. Draw shapes procedurally (see `TitleBar`'s arrow and bar glyphs).

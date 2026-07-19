@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Xna.Framework;
 using FnaWindow;
 
@@ -24,6 +25,11 @@ public sealed class DemoGame : WindowGame
 
         var file = new List<MenuItemDef>
         {
+            MenuItemDef.Item("&Save Screenshot", null, () =>
+            {
+                var path = CaptureScreenshot();
+                _status.Message = "Saved " + Path.GetFileName(path);
+            }),
             MenuItemDef.Item("&About...", null, () => ShowAbout(frame)),
             MenuItemDef.Sep(),
             MenuItemDef.Item("E&xit", null, Exit),

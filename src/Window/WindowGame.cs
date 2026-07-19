@@ -43,6 +43,35 @@ public class WindowGame : Game
     /// streaming (e.g. per token) so the throttle doesn't sleep through it.</summary>
     public void RequestRedraw() => _awakeMs = KeepAwakeMs;
 
+    // Interactive screenshot: grab a clean frame, then a white flash + shutter sound.
+    private ShutterSound? _shutter;
+    private string? _captureTo;
+    private int _captureDelay;
+    private double _flashMs;
+    private const double FlashMs = 220;
+    private const float FlashMaxAlpha = 0.85f;
+
+    /// <summary>
+    /// Save a PNG of the current window, then play the screenshot flash and shutter the way a
+    /// phone does. Pass a path, or leave it null to write a timestamped file into a "Screenshots"
+    /// folder next to the executable. Returns the path it will write. Safe to call from a menu item.
+    /// </summary>
+    public string CaptureScreenshot(string? path = null)
+    {
+        path ??= DefaultShotPath();
+        _captureTo = path;
+        _captureDelay = 2;      // let a closing menu or popup clear before the grab
+        RequestRedraw();
+        return path;
+    }
+
+    private static string DefaultShotPath()
+    {
+        string dir = Path.Combine(AppContext.BaseDirectory, "Screenshots");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, "shot-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png");
+    }
+
     public WindowGame(string title = "FNA Custom Window", int width = 1024, int height = 768)
     {
         _titleText = title;
@@ -115,9 +144,14 @@ public class WindowGame : Game
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
 
-        // Stay at full fps while there's activity or a redraw was requested; otherwise idle.
-        if (Input.AnyActivity || Root.RedrawRequested) { _awakeMs = KeepAwakeMs; Root.ClearRedraw(); }
-        else _awakeMs -= gameTime.ElapsedGameTime.TotalMilliseconds;
+        double dt = gameTime.ElapsedGameTime.TotalMilliseconds;
+        if (_flashMs > 0) _flashMs = Math.Max(0, _flashMs - dt);
+        bool capturing = _captureTo != null || _flashMs > 0;
+
+        // Stay at full fps while there's activity, a redraw was requested, or a capture/flash is
+        // in flight; otherwise idle.
+        if (Input.AnyActivity || Root.RedrawRequested || capturing) { _awakeMs = KeepAwakeMs; Root.ClearRedraw(); }
+        else _awakeMs -= dt;
         if (_awakeMs <= 0 && _shotPath == null) SuppressDraw(); // skip this frame's Draw when idle
 
         base.Update(gameTime);
@@ -131,12 +165,29 @@ public class WindowGame : Game
         _inDraw = true;
         try
         {
+            var vp = GraphicsDevice.Viewport;
             GraphicsDevice.Clear(Theme.Face);
             Batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
                 SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone);
-            try { Root.Draw(Renderer); }
+            try
+            {
+                Root.Draw(Renderer);
+                if (_flashMs > 0)
+                    Renderer.Fill(new Rectangle(0, 0, vp.Width, vp.Height),
+                        Color.White * (FlashMaxAlpha * (float)(_flashMs / FlashMs)));
+            }
             finally { Batch.End(); }
             base.Draw(gameTime);
+
+            // Interactive capture: wait a couple of frames so a closing menu is gone, then grab a
+            // clean frame (the flash is not part of it) and kick off the flash + shutter.
+            if (_captureTo != null && --_captureDelay < 0)
+            {
+                SaveShot(_captureTo);
+                _captureTo = null;
+                _flashMs = FlashMs;
+                (_shutter ??= new ShutterSound()).Play();
+            }
 
             if (_shotPath != null && ++_frames >= 10) { SaveShot(_shotPath); Exit(); }
         }
