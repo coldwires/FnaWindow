@@ -30,9 +30,23 @@ public sealed record Palette(
 /// </summary>
 public static class ThemeManager
 {
-    /// <summary>Raised after a palette is applied.</summary>
+    /// <summary>Raised after a palette or skin is applied.</summary>
     public static event Action? Changed;
     public static string Current { get; private set; } = "Windows 3.1";
+
+    /// <summary>
+    /// The active skin - how chrome (panels/bevels) is drawn. Defaults to the classic
+    /// <see cref="Win31Skin"/>. Swap it with <see cref="ApplySkin"/>. A palette changes colors; a
+    /// skin changes drawing. The two are independent (a skin can be paired with any palette).
+    /// </summary>
+    public static Skin Skin { get; private set; } = new Win31Skin();
+
+    /// <summary>Swap the active skin and notify views to rebuild any cached drawing state.</summary>
+    public static void ApplySkin(Skin skin)
+    {
+        Skin = skin;
+        Changed?.Invoke();
+    }
 
     private static Color C(int rgb) => new((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 

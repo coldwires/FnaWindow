@@ -87,55 +87,16 @@ public sealed class Win31Renderer
         VLine(r.Right - 1, r.Top, r.Height, c);
     }
 
-    // ── Bevels ────────────────────────────────────────────────
-    // Convention: draw the shadow (bottom/right) L-shape first, then the highlight
-    // (top/left) L-shape, so highlight wins the TR/BL corners - the classic look.
+    // ── Bevels (forwarded to the active skin) ─────────────────────────────
+    // The look of panels/bevels lives in the active Skin (default Win31Skin), so a skin swap can
+    // change chrome drawing without touching a single widget. See src/Theme/Skin.cs.
 
-    public void DrawBevel(Rectangle r, BevelStyle style)
-    {
-        switch (style)
-        {
-            case BevelStyle.RaisedThin:
-                Edges(r, Theme.LightEdge, Theme.DarkEdge);
-                break;
-
-            case BevelStyle.SunkenThin: // inverse of RaisedThin
-                Edges(r, Theme.MidEdge, Theme.LightEdge);
-                break;
-
-            case BevelStyle.RaisedThick:
-                Edges(r, Theme.LightEdge, Theme.DarkEdge);         // outer
-                Edges(Inset(r, 1), Theme.Face, Theme.MidEdge);     // inner
-                break;
-
-            case BevelStyle.SunkenThick:
-                Edges(r, Theme.MidEdge, Theme.LightEdge);          // outer
-                Edges(Inset(r, 1), Theme.DarkEdge, Theme.Face);    // inner
-                break;
-        }
-    }
+    public void DrawBevel(Rectangle r, BevelStyle style) => ThemeManager.Skin.DrawBevel(this, r, style);
 
     /// <summary>Bevel border plus an interior fill (interior excludes the bevel thickness).</summary>
-    public void DrawPanel(Rectangle r, BevelStyle style, Color bg)
-    {
-        int t = Thickness(style);
-        Fill(new Rectangle(r.X + t, r.Y + t, Math.Max(0, r.Width - 2 * t), Math.Max(0, r.Height - 2 * t)), bg);
-        DrawBevel(r, style);
-    }
+    public void DrawPanel(Rectangle r, BevelStyle style, Color bg) => ThemeManager.Skin.DrawPanel(this, r, style, bg);
 
-    public static int Thickness(BevelStyle s)
-        => s is BevelStyle.RaisedThick or BevelStyle.SunkenThick ? 2 : 1;
-
-    // Draws a 1px raised/sunken ring: top+left in <paramref name="tl"/>, bottom+right in <paramref name="br"/>.
-    private void Edges(Rectangle r, Color tl, Color br)
-    {
-        // shadow L first
-        HLine(r.Left, r.Bottom - 1, r.Width, br);   // bottom
-        VLine(r.Right - 1, r.Top, r.Height, br);    // right
-        // highlight L second (wins contested corners)
-        HLine(r.Left, r.Top, r.Width, tl);          // top
-        VLine(r.Left, r.Top, r.Height, tl);         // left
-    }
+    public static int Thickness(BevelStyle s) => ThemeManager.Skin.Thickness(s);
 
     public static Rectangle Inset(Rectangle r, int n)
         => new(r.X + n, r.Y + n, r.Width - 2 * n, r.Height - 2 * n);
