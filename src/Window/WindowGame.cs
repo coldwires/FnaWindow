@@ -140,6 +140,7 @@ public class WindowGame : Game
 
     protected override void Update(GameTime gameTime)
     {
+        if (MainThread.Drain()) RequestRedraw();   // apply background-thread work on the UI thread
         Input.Update(gameTime);
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);

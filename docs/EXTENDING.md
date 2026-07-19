@@ -300,6 +300,27 @@ device it stays silent instead of failing. For headless or CI capture without th
 sound, set the `FNAWINDOW_SHOT` environment variable to a path and the window saves that file
 and exits after a few frames.
 
+## Background work
+
+The game loop and all rendering run on one thread, and FNA requires it: create textures, touch
+widgets, and draw only on the game thread. To keep the UI responsive during slow work (a
+subprocess, file scans, parsing, indexing, network), do that work on your own thread and marshal
+the result back with `MainThread`:
+
+```csharp
+// on a worker thread
+var result = DoSomethingSlow();
+MainThread.Post(() =>
+{
+    // back on the game thread: safe to touch widgets and upload textures
+    view.SetData(result);
+    RequestRedraw();          // wake the idle throttle so the change shows
+});
+```
+
+`WindowGame` drains the queue at the start of every `Update`, so posted actions run before the
+next frame. `MainThread.Post` is safe to call from any thread; the loop never blocks on a worker.
+
 ## Gotchas
 
 - **ASCII-only fonts.** Unicode glyphs render as blanks. Draw shapes procedurally (see `TitleBar`'s arrow and bar glyphs).
