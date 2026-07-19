@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    FnaWindow - a reusable Windows 3.1-styled, borderless custom-window engine on FNA.
+
+    This is the *library*. Reference it from your app and subclass WindowGame to build a
+    complete desktop program with 100% custom chrome. The runnable example lives in Demo/.
+
+    Vendors FNA + its native libs under lib/ (self-contained: clone anywhere and build).
+    The engine source lives under src/ (Gui / Window / Theme). The Content fonts and the
+    native fnalibs are shipped as Content, so they flow into any project that references
+    this one - a consumer gets a working window with no extra asset wiring.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>FnaWindow</RootNamespace>
+    <AssemblyName>FnaWindow</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!--
+    Keep the library build to src/ only. The default SDK glob is recursive from this
+    directory, so explicitly drop vendored FNA, the Demo app, and the copy-paste templates
+    (each is its own project or non-project text).
+  -->
+  <ItemGroup>
+    <Compile Remove="lib\**\*.cs" />
+    <Compile Remove="Demo\**\*.cs" />
+    <Compile Remove="templates\**\*.cs" />
+    <None Remove="lib\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="lib\FNA\FNA.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Native libs and baked bitmap-font atlases, marked as Content so they copy to *this*
+    project's output AND transitively into any consumer's output directory.
+  -->
+  <ItemGroup>
+    <Content Include="lib\fnalibs\*.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="Content\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>

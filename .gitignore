@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+[Bb]uild/
+*.user
+*.suo
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# NOTE: lib/ (vendored FNA source) and lib/fnalibs/*.dll (native libs) are committed
+# on purpose so the repo clones-and-builds. Their build outputs are ignored via bin/ + obj/.

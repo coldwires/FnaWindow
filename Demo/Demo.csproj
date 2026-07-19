@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Demo - the runnable example app. It consumes FnaWindow exactly the way a build-on
+    would: one ProjectReference to the engine, then subclass WindowGame. The engine's
+    Content (fonts) and native libs flow in automatically, so there's nothing else to wire.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>FnaWindow.Demo</RootNamespace>
+    <AssemblyName>FnaWindowDemo</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FnaWindow.csproj" />
+  </ItemGroup>
+
+</Project>

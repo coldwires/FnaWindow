@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A build-on for the FnaWindow engine. The engine is expected at engine/ as a git submodule:
+        git submodule add <engine-repo-url> engine
+    The single ProjectReference below pulls in the engine library, FNA, the native libs, and
+    the bundled fonts. Nothing else to wire up.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="engine\FnaWindow.csproj" />
+  </ItemGroup>
+
+</Project>
