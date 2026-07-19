@@ -22,7 +22,8 @@ public class WindowGame : Game
     protected Win31Renderer Renderer = null!;
     protected readonly InputState Input = new();
     protected RootDesktop Root = null!;
-    protected WindowFrame Frame = null!;
+    protected Widget Frame = null!;          // the root frame widget (a WindowFrame by default)
+    protected TitleBar Caption = null!;      // its title bar: drives close/min/max + the drag hit-test
     protected BitmapFont UiFont = null!, UiBoldFont = null!, EditorFont = null!;
 
     private readonly string _titleText;
@@ -92,6 +93,19 @@ public class WindowGame : Game
     /// <summary>Populate the frame: set <c>frame.Title.Title</c>, and SetMenu / SetContent / SetStatus.</summary>
     protected virtual void BuildUi(WindowFrame frame, BitmapFont uiFont) { }
 
+    /// <summary>
+    /// Build the root frame and return it with the title bar that drives close/minimize/maximize
+    /// and the drag hit-test. The default builds a <see cref="WindowFrame"/> and calls
+    /// <see cref="BuildUi"/>; override to supply a custom frame (any Widget with its own TitleBar).
+    /// </summary>
+    protected virtual (Widget frame, TitleBar caption) BuildFrame(BitmapFont uiFont)
+    {
+        var wf = new WindowFrame();
+        wf.Title.Title = _titleText;
+        BuildUi(wf, uiFont);
+        return (wf, wf.Title);
+    }
+
     protected override void LoadContent()
     {
         Batch = new SpriteBatch(GraphicsDevice);
@@ -104,14 +118,11 @@ public class WindowGame : Game
         Renderer = new Win31Renderer(GraphicsDevice, Batch, UiFont, UiBoldFont, EditorFont);
 
         Root = new RootDesktop();
-        Frame = new WindowFrame();
-        Frame.Title.Title = _titleText;
-        Frame.Title.OnClose = Exit;
-        Frame.Title.OnMinimize = () => { if (_borderless) WindowChrome.Minimize(_sdlWindow); };
-        Frame.Title.OnMaximize = ToggleMaximize;
+        (Frame, Caption) = BuildFrame(UiFont);
+        Caption.OnClose = Exit;
+        Caption.OnMinimize = () => { if (_borderless) WindowChrome.Minimize(_sdlWindow); };
+        Caption.OnMaximize = ToggleMaximize;
         Root.Add(Frame);
-
-        BuildUi(Frame, UiFont);
         Relayout();
 
         // Strip the OS frame so only our chrome shows; drag/resize handled natively via WM_NCHITTEST.
@@ -256,7 +267,7 @@ public class WindowGame : Game
         if (r) return WindowChrome.HTRIGHT;
         if (tp) return WindowChrome.HTTOP;
         if (bt) return WindowChrome.HTBOTTOM;
-        if (Frame.Title.IsOnDragArea(new Point(cx, cy))) return WindowChrome.HTCAPTION;
+        if (Caption.IsOnDragArea(new Point(cx, cy))) return WindowChrome.HTCAPTION;
         return WindowChrome.HTCLIENT;
     }
 }
