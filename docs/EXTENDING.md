@@ -219,7 +219,11 @@ The dialog auto-sizes its height to the prompt and centers itself.
 
 ## Theming
 
-A `Palette` is a record of chrome colors. `ThemeManager.Apply(palette)` writes them into `Theme`'s mutable statics and raises `ThemeManager.Changed`. Because every widget reads `Theme.*` at draw time, the whole UI reskins instantly.
+A `Palette` is a record of the chrome colors, plus optional syntax and squiggle colors for apps
+that render code (keyword, type, string, comment, error, warning). `ThemeManager.Apply(palette)`
+writes them into `Theme`'s mutable statics and raises `ThemeManager.Changed`. Because every widget
+reads `Theme.*` at draw time, the whole UI reskins instantly. The syntax/squiggle fields are
+optional; leave them out on a palette that does not render code, and those colors are left as-is.
 
 ```csharp
 var Amber = new Palette("Amber CRT",
@@ -233,7 +237,9 @@ var Amber = new Palette("Amber CRT",
 ThemeManager.Apply(Amber);
 ```
 
-Build a Themes menu by iterating `ThemeManager.All` (see `DemoGame`). If a widget caches colors (for example pre-highlighted text), subscribe to `ThemeManager.Changed` and invalidate.
+Add your own palettes to the shared set with `ThemeManager.Register(palette)`, then build a Themes
+menu by iterating `ThemeManager.All` (see `DemoGame`). If a widget caches colors (for example
+pre-highlighted text), subscribe to `ThemeManager.Changed` and invalidate.
 
 ---
 
