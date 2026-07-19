@@ -167,8 +167,7 @@ public sealed class MenuBar : Widget
 /// </summary>
 public sealed class Menu : Widget
 {
-    // Theme.MenuItemHeight is static readonly (not const), so mirror the value here.
-    private const int RowH = 17;
+    private static int RowH => Theme.MenuItemHeight; // skin-driven row height
     private const int SepH = 6;
     private const int LeftPad = 20;   // room for checkmark
     private const int RightPad = 12;

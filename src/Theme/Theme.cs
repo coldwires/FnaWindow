@@ -34,16 +34,19 @@ public static class Theme
     public static Color SyntaxComment  = Rgb(0x80, 0x80, 0x80); // comments
 
     // ── Metrics ───────────────────────────────────────────────────────────
-    public const int TitleBarHeight      = 20;
-    public const int MenuBarHeight       = 19;
-    public const int MenuItemHeight      = 17;
-    public const int ToolbarHeight       = 26;
-    public const int ToolButtonSize      = 22;
-    public const int StatusBarHeight     = 20;
+    // Height/size metrics come from the active skin (a bigger-font skin needs taller rows); the
+    // defaults are the classic Win 3.1 values held in the Skin base. The rest are consts.
+    public static int TitleBarHeight      => ThemeManager.Skin.TitleBarHeight;
+    public static int MenuBarHeight       => ThemeManager.Skin.MenuBarHeight;
+    public static int MenuItemHeight      => ThemeManager.Skin.MenuItemHeight;
+    public static int ToolbarHeight       => ThemeManager.Skin.ToolbarHeight;
+    public static int ToolButtonSize      => ThemeManager.Skin.ToolButtonSize;
+    public static int StatusBarHeight     => ThemeManager.Skin.StatusBarHeight;
+    public static int ScrollBarThickness  => ThemeManager.Skin.ScrollBarThickness;
+    public static int MdiChildTitleHeight => ThemeManager.Skin.MdiChildTitleHeight;
+
     public const int StatusCellPadX      = 6;
     public const int StatusCellPadY      = 2;
-    public const int ScrollBarThickness  = 16;
-    public const int MdiChildTitleHeight = 18;
     public const int WindowBorder        = 4;
     public const int EditorPaddingLeft   = 8;
     public const int EditorPaddingTop    = 6;

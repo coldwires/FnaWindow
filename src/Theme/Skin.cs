@@ -36,4 +36,16 @@ public abstract class Skin
     /// <summary>The skin's own UI font, or null to use the app's default. When non-null the renderer
     /// returns it from <see cref="Win31Renderer.UiFont"/>, so widgets both measure and draw with it.</summary>
     public virtual BitmapFont? UiFont => null;
+
+    // Chrome heights/sizes (Theme forwards to these). Defaults are the classic Win 3.1 values; a
+    // skin can enlarge them - e.g. a bigger font needs taller rows and bars. Non-size metrics
+    // (paddings, editor cell) stay Theme consts.
+    public virtual int TitleBarHeight => 20;
+    public virtual int MenuBarHeight => 19;
+    public virtual int MenuItemHeight => 17;
+    public virtual int ToolbarHeight => 26;
+    public virtual int ToolButtonSize => 22;
+    public virtual int StatusBarHeight => 20;
+    public virtual int MdiChildTitleHeight => 18;
+    public virtual int ScrollBarThickness => 16;
 }
