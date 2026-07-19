@@ -16,14 +16,16 @@ public sealed class Win31Renderer
     private readonly Texture2D _dither; // 2×2 Face/LightEdge checker (scrollbar tracks)
 
     public SpriteBatch Sb { get; }
-    public BitmapFont UiFont { get; }
+    private readonly BitmapFont _uiFont;
+    /// <summary>The UI font - the active skin's own font if it provides one, else the app default.</summary>
+    public BitmapFont UiFont => ThemeManager.Skin.UiFont ?? _uiFont;
     public BitmapFont UiBoldFont { get; }
     public BitmapFont EditorFont { get; }
 
     public Win31Renderer(GraphicsDevice gd, SpriteBatch sb, BitmapFont uiFont, BitmapFont uiBoldFont, BitmapFont editorFont)
     {
         Sb = sb;
-        UiFont = uiFont;
+        _uiFont = uiFont;
         UiBoldFont = uiBoldFont;
         EditorFont = editorFont;
         _pixel = new Texture2D(gd, 1, 1);

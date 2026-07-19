@@ -45,7 +45,7 @@ public sealed class BitmapFont
 
         var map = new Dictionary<int, GlyphRec>(doc.Glyphs.Count);
         foreach (var g in doc.Glyphs)
-            map[g.C] = new GlyphRec(new Rectangle(g.X, g.Y, g.W, g.H), g.Advance);
+            map[g.C] = new GlyphRec(new Rectangle(g.X, g.Y, g.W, g.H), g.Advance, g.XOff, g.YOff);
 
         return new BitmapFont(atlas, map, doc.LineHeight, doc.CellW);
     }
@@ -79,7 +79,7 @@ public sealed class BitmapFont
             if (_glyphs.TryGetValue(c, out var g))
             {
                 if (c != ' ')
-                    sb.Draw(_atlas, new Vector2(pen, y), g.Src, color);
+                    sb.Draw(_atlas, new Vector2(pen + g.XOff, y + g.YOff), g.Src, color);
                 pen += g.Advance;
             }
             else
@@ -91,7 +91,7 @@ public sealed class BitmapFont
 
     public void Draw(SpriteBatch sb, string s, Point pos, Color color) => Draw(sb, s, pos.X, pos.Y, color);
 
-    private readonly record struct GlyphRec(Rectangle Src, int Advance);
+    private readonly record struct GlyphRec(Rectangle Src, int Advance, int XOff, int YOff);
 
     // ── JSON DTOs (match tools/FontGen output) ────────────────────────────
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -115,5 +115,8 @@ public sealed class BitmapFont
         [JsonPropertyName("w")] public int W { get; set; }
         [JsonPropertyName("h")] public int H { get; set; }
         [JsonPropertyName("advance")] public int Advance { get; set; }
+        // Optional per-glyph draw offset from the pen (0 for monospace/cell fonts).
+        [JsonPropertyName("xoff")] public int XOff { get; set; }
+        [JsonPropertyName("yoff")] public int YOff { get; set; }
     }
 }

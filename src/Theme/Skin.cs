@@ -32,4 +32,8 @@ public abstract class Skin
     /// vertical list row (a skin may add a selector arrow); default fills the navy selection color.</summary>
     public virtual void DrawSelection(Win31Renderer r, Rectangle rect, bool showArrow)
         => r.Fill(rect, Theme.TitleActive);
+
+    /// <summary>The skin's own UI font, or null to use the app's default. When non-null the renderer
+    /// returns it from <see cref="Win31Renderer.UiFont"/>, so widgets both measure and draw with it.</summary>
+    public virtual BitmapFont? UiFont => null;
 }
