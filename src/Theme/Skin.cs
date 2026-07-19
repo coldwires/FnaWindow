@@ -22,4 +22,14 @@ public abstract class Skin
 
     /// <summary>Draw just the border/bevel of <paramref name="style"/>.</summary>
     public abstract void DrawBevel(Win31Renderer r, Rectangle rect, BevelStyle style);
+
+    /// <summary>Draw a UI text run. Default is a plain draw; a skin may add a drop-shadow, etc.
+    /// Editor/code text draws directly (not through here), so it stays crisp regardless of skin.</summary>
+    public virtual void DrawText(Win31Renderer r, BitmapFont font, string s, int x, int y, Color color)
+        => font.Draw(r.Sb, s, x, y, color);
+
+    /// <summary>Draw the selection background of a menu/list row. <paramref name="showArrow"/> hints a
+    /// vertical list row (a skin may add a selector arrow); default fills the navy selection color.</summary>
+    public virtual void DrawSelection(Win31Renderer r, Rectangle rect, bool showArrow)
+        => r.Fill(rect, Theme.TitleActive);
 }

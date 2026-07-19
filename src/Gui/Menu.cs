@@ -149,7 +149,7 @@ public sealed class MenuBar : Widget
         {
             var m = Menus[i];
             bool active = i == _openIndex || (!IsOpen && i == _hovered);
-            if (active) r.Fill(m.TitleRect, Theme.TitleActive);
+            if (active) ThemeManager.Skin.DrawSelection(r, m.TitleRect, showArrow: false);
             var color = active ? Theme.TitleText : Theme.Text;
             int tx = m.TitleRect.X + TitlePadX;
             int ty = m.TitleRect.Y + (m.TitleRect.Height - r.UiFont.LineHeight) / 2;
@@ -286,7 +286,7 @@ public sealed class Menu : Widget
             }
 
             bool sel = i == _selected;
-            if (sel) r.Fill(row, Theme.TitleActive);
+            if (sel) ThemeManager.Skin.DrawSelection(r, row, showArrow: true);
 
             Color labelColor = !it.Enabled ? Theme.TextDisabled : sel ? Theme.TitleText : Theme.Text;
             Color shortcutColor = sel ? Theme.TitleText : Theme.TextDisabled;

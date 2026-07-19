@@ -102,8 +102,8 @@ public sealed class Win31Renderer
         => new(r.X + n, r.Y + n, r.Width - 2 * n, r.Height - 2 * n);
 
     // ── Text ──────────────────────────────────────────────────────────────
-    public void DrawText(BitmapFont font, string s, int x, int y, Color color) => font.Draw(Sb, s, x, y, color);
-    public void DrawText(BitmapFont font, string s, Point p, Color color) => font.Draw(Sb, s, p.X, p.Y, color);
+    public void DrawText(BitmapFont font, string s, int x, int y, Color color) => ThemeManager.Skin.DrawText(this, font, s, x, y, color);
+    public void DrawText(BitmapFont font, string s, Point p, Color color) => ThemeManager.Skin.DrawText(this, font, s, p.X, p.Y, color);
 
     /// <summary>
     /// Draws a label honoring Win 3.1 accelerator markup: "&amp;F" underlines the F,
@@ -112,7 +112,7 @@ public sealed class Win31Renderer
     public void DrawTextMnemonic(BitmapFont font, string raw, int x, int y, Color color)
     {
         var (disp, uidx) = ParseMnemonic(raw);
-        font.Draw(Sb, disp, x, y, color);
+        ThemeManager.Skin.DrawText(this, font, disp, x, y, color);
         if (uidx >= 0)
         {
             int ux = x + font.MeasureWidth(disp.Substring(0, uidx));
