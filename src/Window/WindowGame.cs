@@ -147,6 +147,10 @@ public class WindowGame : Game
         Root.Add(Frame);
         Relayout();
 
+        // A skin change can swap the font (and thus measured widths), so re-lay-out the whole tree
+        // when it happens - otherwise font-dependent layout (e.g. menu-bar title widths) goes stale.
+        ThemeManager.Changed += () => { Relayout(); RequestRedraw(); };
+
         // Strip the OS frame so only our chrome shows; drag/resize handled natively via WM_NCHITTEST.
         if (WindowChrome.Supported)
         {
