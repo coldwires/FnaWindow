@@ -12,6 +12,11 @@ public sealed class RootDesktop : Widget
     public PopupLayer Popup { get; } = new();
     public Widget? Focused { get; private set; }
 
+    /// <summary>A widget mid-drag (e.g. resizing a window) can claim the cursor so its shape stays put
+    /// even if the pointer briefly leaves it. Set on drag start, cleared on release. Null = resolve by
+    /// hit-test. The window's cursor resolve consults the captured widget first.</summary>
+    public Widget? CursorCapture;
+
     public RootDesktop()
     {
         Popup.Parent = this;

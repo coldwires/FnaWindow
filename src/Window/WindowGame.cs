@@ -124,6 +124,25 @@ public class WindowGame : Game
     /// </summary>
     protected virtual MouseCursor? BuildCursor() => null;
 
+    /// <summary>The default cursor key (see <see cref="Cursors"/>), used wherever no widget asks for a
+    /// specific one. Null (default) means the app registered no cursors, so the OS cursor is left alone.</summary>
+    protected string? CursorDefault;
+
+    // Each frame, pick the cursor: a mid-drag widget that captured it wins; else arrow over an open
+    // popup; else the topmost hit widget's CursorKey (walking up to a parent that has an opinion);
+    // else the default. No-op until an app sets CursorDefault and registers cursors.
+    private void ResolveCursor()
+    {
+        if (CursorDefault == null || !Cursors.Any) return;
+        string key = CursorDefault;
+        if (Root.CursorCapture is { } cap)
+            key = cap.CursorKey(Input.Mouse) ?? key;
+        else if (!Root.Popup.IsOpen)
+            for (var w = Root.HitTest(Input.Mouse); w != null; w = w.Parent)
+                if (w.CursorKey(Input.Mouse) is { } k) { key = k; break; }
+        Cursors.Set(key);
+    }
+
     protected override void LoadContent()
     {
         Batch = new SpriteBatch(GraphicsDevice);
@@ -180,6 +199,7 @@ public class WindowGame : Game
         if (MainThread.Drain()) RequestRedraw();   // apply background-thread work on the UI thread
         Input.Update(gameTime);
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
+        ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
 
         double dt = gameTime.ElapsedGameTime.TotalMilliseconds;
@@ -266,6 +286,7 @@ public class WindowGame : Game
             ApplyWindow(_restore.X, _restore.Y, _restore.Width, _restore.Height, move: true);
             _maximized = false;
         }
+        Caption.Maximized = _maximized; // caption shows restore vs maximize glyph
     }
 
     private void ApplyWindow(int x, int y, int w, int h, bool move)

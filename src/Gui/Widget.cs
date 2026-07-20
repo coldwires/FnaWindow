@@ -51,6 +51,11 @@ public abstract class Widget
         return this;
     }
 
+    /// <summary>The cursor key this widget wants when the pointer is at <paramref name="p"/> (already
+    /// hit-tested into it), or null to defer to its parent / the window default. Lets a widget show a
+    /// region cursor (e.g. an I-beam over editor text) without any global wiring.</summary>
+    public virtual string? CursorKey(Point p) => null;
+
     // Focus + input events (used from M2 onward; menus handle keys in Update for M1).
     public virtual bool WantsKeyboard => false;
     public virtual void OnKey(InputState input) { }
