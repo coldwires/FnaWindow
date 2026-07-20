@@ -13,10 +13,10 @@ public static class Theme
     private static Color Rgb(int r, int g, int b) => new(r, g, b);
 
     // ── Palette (mutable; see class summary) ──────────────────────────────
-    public static Color Face          = Rgb(0xC0, 0xC0, 0xC0); // all chrome surfaces
+    public static Color Face          = Rgb(0xC6, 0xC6, 0xC6); // all chrome surfaces
     public static Color LightEdge     = Rgb(0xFF, 0xFF, 0xFF); // raised top/left
     public static Color DarkEdge      = Rgb(0x40, 0x40, 0x40); // raised bottom/right (outer)
-    public static Color MidEdge       = Rgb(0x80, 0x80, 0x80); // inner shadow / separators
+    public static Color MidEdge       = Rgb(0x84, 0x84, 0x84); // inner shadow / separators / thin bevel
     public static Color TitleActive   = Rgb(0x00, 0x00, 0x80); // active title bars, selection
     public static Color TitleInactive = Rgb(0x80, 0x80, 0x80); // inactive title bars
     public static Color TitleText     = Rgb(0xFF, 0xFF, 0xFF); // text on title bars/selections

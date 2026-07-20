@@ -42,6 +42,7 @@ public sealed class MenuBar : Widget
     private const int TitlePadX = 8;
 
     public List<TopMenu> Menus { get; }
+    public BitmapFont? BarFont; // top-bar label font (File/Edit); null -> the UI font
     private int _openIndex = -1;
     private Menu? _popup;
     private int _hovered = -1;
@@ -68,7 +69,7 @@ public sealed class MenuBar : Widget
     public Func<string, int>? MeasureTitleWidth;
     public Func<string, int>? MeasureItemWidth;
     private int MeasureTitle(string disp)
-        => (MeasureTitleWidth?.Invoke(disp) ?? disp.Length * 6) + TitlePadX * 2;
+        => (BarFont?.MeasureWidth(disp) ?? MeasureTitleWidth?.Invoke(disp) ?? disp.Length * 6) + TitlePadX * 2;
 
     public override void Update(InputState input, GameTime t)
     {
@@ -130,6 +131,7 @@ public sealed class MenuBar : Widget
             ScreenWidth = root.Bounds.Width,
             ScreenHeight = root.Bounds.Height,
             MeasureWidth = MeasureItemWidth,
+            Font = BarFont, // dropdown items match the menu-bar font
         };
         _popup.Layout();
         root.Popup.Open(_popup);
@@ -144,7 +146,8 @@ public sealed class MenuBar : Widget
 
     public override void Draw(Win31Renderer r)
     {
-        r.Fill(Bounds, Theme.Face);
+        r.Fill(Bounds, Theme.WindowBg); // 3.1 menu bar is white (95 is grey face)
+        var font = BarFont ?? r.UiFont;
         for (int i = 0; i < Menus.Count; i++)
         {
             var m = Menus[i];
@@ -152,8 +155,8 @@ public sealed class MenuBar : Widget
             if (active) ThemeManager.Skin.DrawSelection(r, m.TitleRect, showArrow: false);
             var color = active ? Theme.TitleText : Theme.Text;
             int tx = m.TitleRect.X + TitlePadX;
-            int ty = m.TitleRect.Y + (m.TitleRect.Height - r.UiFont.LineHeight) / 2;
-            r.DrawTextMnemonic(r.UiFont, m.Title, tx, ty, color);
+            int ty = m.TitleRect.Y + (m.TitleRect.Height - font.LineHeight) / 2;
+            r.DrawTextMnemonic(font, m.Title, tx, ty, color);
         }
     }
 
@@ -167,7 +170,8 @@ public sealed class MenuBar : Widget
 /// </summary>
 public sealed class Menu : Widget
 {
-    private static int RowH => Theme.MenuItemHeight; // skin-driven row height
+    // Row height follows the popup font when one is set (so rows fit larger text), else the skin metric.
+    private int RowH => Font != null ? Font.LineHeight + 3 : Theme.MenuItemHeight;
     private const int SepH = 6;
     private const int LeftPad = 20;   // room for checkmark
     private const int RightPad = 12;
@@ -181,13 +185,14 @@ public sealed class Menu : Widget
     public Point Anchor;
     public int ScreenWidth = 1024;
     public int ScreenHeight = 768;
+    public BitmapFont? Font; // item font; null -> the UI font. When set it also drives measuring.
 
     // onClose lets any owner (the menu bar, or a Frame context menu) dismiss this popup.
     public Menu(Action onClose, List<MenuItemDef> items) { _onClose = onClose; _items = items; }
 
     public Func<string, int>? MeasureWidth; // set by Frame (UI font)
 
-    private int W(string s) => MeasureWidth?.Invoke(s) ?? s.Length * 6;
+    private int W(string s) => Font != null ? Font.MeasureWidth(s) : MeasureWidth?.Invoke(s) ?? s.Length * 6;
 
     public override void Layout()
     {
@@ -278,9 +283,8 @@ public sealed class Menu : Widget
             var row = _rowRects[i];
             if (it.IsSeparator)
             {
-                int gy = row.Y + row.Height / 2;
-                r.HLine(row.X + 2, gy, row.Width - 4, Theme.MidEdge);
-                r.HLine(row.X + 2, gy + 1, row.Width - 4, Theme.LightEdge);
+                // Full popup width (over the side border), the Win 3.1 look - not the inset row.
+                ThemeManager.Skin.DrawMenuSeparator(r, new Rectangle(Bounds.X, row.Y, Bounds.Width, row.Height));
                 continue;
             }
 
@@ -290,26 +294,17 @@ public sealed class Menu : Widget
             Color labelColor = !it.Enabled ? Theme.TextDisabled : sel ? Theme.TitleText : Theme.Text;
             Color shortcutColor = sel ? Theme.TitleText : Theme.TextDisabled;
 
-            int ty = row.Y + (row.Height - r.UiFont.LineHeight) / 2;
-            if (it.Checked) DrawCheck(r, row.X + 6, row.Y + row.Height / 2, labelColor);
-            r.DrawTextMnemonic(r.UiFont, it.Label, row.X + LeftPad, ty, labelColor);
+            var font = Font ?? r.UiFont;
+            int ty = row.Y + (row.Height - font.LineHeight) / 2;
+            if (it.Checked) ThemeManager.Skin.DrawMenuCheck(r, row.X + 6, row.Y + row.Height / 2, labelColor);
+            r.DrawTextMnemonic(font, it.Label, row.X + LeftPad, ty, labelColor);
 
             if (it.Shortcut != null)
             {
-                int sw = r.UiFont.MeasureWidth(it.Shortcut);
-                r.DrawText(r.UiFont, it.Shortcut, row.Right - RightPad - sw, ty, shortcutColor);
+                int sw = font.MeasureWidth(it.Shortcut);
+                r.DrawText(font, it.Shortcut, row.Right - RightPad - sw, ty, shortcutColor);
             }
         }
-    }
-
-    private static void DrawCheck(Win31Renderer r, int cx, int cy, Color c)
-    {
-        // small 5px check mark
-        r.Fill(cx, cy, 1, 1, c);
-        r.Fill(cx + 1, cy + 1, 1, 1, c);
-        r.Fill(cx + 2, cy, 1, 1, c);
-        r.Fill(cx + 3, cy - 1, 1, 1, c);
-        r.Fill(cx + 4, cy - 2, 1, 1, c);
     }
 
     public override Widget? HitTest(Point p) => Bounds.Contains(p) ? this : null;

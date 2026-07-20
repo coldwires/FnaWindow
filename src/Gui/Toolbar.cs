@@ -34,7 +34,7 @@ public sealed class ToolButton : Widget
     public override void Draw(Win31Renderer r)
     {
         bool down = _armed && Bounds.Contains(GlobalMouse) && Enabled;
-        r.DrawPanel(Bounds, down ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
+        ThemeManager.Skin.DrawButton(r, Bounds, down);
 
         var inner = Bounds;
         if (down) inner.Offset(1, 1);
@@ -82,8 +82,8 @@ public sealed class Toolbar : Widget
     public override void Layout()
     {
         int sz = Theme.ToolButtonSize;
-        int y = Bounds.Y + (Bounds.Height - sz) / 2;
-        int x = Bounds.X + 3;
+        int y = Bounds.Y + (Bounds.Height - sz) / 2; // buttons fill the (now shorter) bar; sit at top
+        int x = Bounds.X;                            // nudged left 3px (was +3)
 
         void Place(ToolButton b, int w) { b.Bounds = new Rectangle(x, y, w, sz); x += w + 1; }
         int TextW(string s) => MeasureText?.Invoke(s) ?? s.Length * 7;

@@ -40,12 +40,127 @@ public abstract class Skin
     // Chrome heights/sizes (Theme forwards to these). Defaults are the classic Win 3.1 values; a
     // skin can enlarge them - e.g. a bigger font needs taller rows and bars. Non-size metrics
     // (paddings, editor cell) stay Theme consts.
-    public virtual int TitleBarHeight => 20;
-    public virtual int MenuBarHeight => 19;
+    public virtual int TitleBarHeight => 19;
+    public virtual int MenuBarHeight => 24;
     public virtual int MenuItemHeight => 17;
-    public virtual int ToolbarHeight => 26;
+    public virtual int ToolbarHeight => 22;
     public virtual int ToolButtonSize => 22;
     public virtual int StatusBarHeight => 20;
-    public virtual int MdiChildTitleHeight => 18;
+    public virtual int MdiChildTitleHeight => 19;
     public virtual int ScrollBarThickness => 16;
+
+    // ── Small glyph-bearing buttons (title caption + scrollbar) ───────────
+    // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
+    // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.
+
+    /// <summary>The caption button's edge length. Default is the classic 18px; an art skin returns
+    /// the button PNG's native size so the layout (and click area) follow the art, never stretched.</summary>
+    public virtual int CaptionButtonSize(CaptionButton kind) => WindowCaption.ButtonSize;
+
+    public virtual void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
+    {
+        r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
+        var b = rect; if (pressed) b.Offset(1, 1);
+        switch (kind)
+        {
+            case CaptionButton.System: DrawSysGlyph(r, b); break;
+            case CaptionButton.Minimize: DrawMinGlyph(r, b); break;
+            case CaptionButton.Maximize: DrawMaxGlyph(r, b); break;
+            case CaptionButton.Restore: DrawRestoreGlyph(r, b); break;
+        }
+    }
+
+    /// <summary>A menu row's checkmark at (cx, cy) in <paramref name="color"/>. Default is the 5px tick.</summary>
+    public virtual void DrawMenuCheck(Win31Renderer r, int cx, int cy, Color color)
+    {
+        r.Fill(cx, cy, 1, 1, color);
+        r.Fill(cx + 1, cy + 1, 1, 1, color);
+        r.Fill(cx + 2, cy, 1, 1, color);
+        r.Fill(cx + 3, cy - 1, 1, 1, color);
+        r.Fill(cx + 4, cy - 2, 1, 1, color);
+    }
+
+    /// <summary>A push button's background + bevel (e.g. toolbar buttons). Default is the classic
+    /// raised/sunken thin bevel; an art skin can supply authored button art.</summary>
+    public virtual void DrawButton(Win31Renderer r, Rectangle rect, bool pressed)
+        => DrawPanel(r, rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
+
+    /// <summary>A window's outer frame (top-level window and MDI children). Default is this skin's own
+    /// thick raised bevel, so every skin frames its windows in its own style; Win 3.1 overrides it with
+    /// the flat black frame, and an art skin with a 9-slice frame PNG.</summary>
+    public virtual void DrawWindowFrame(Win31Renderer r, Rectangle rect)
+        => DrawBevel(r, rect, BevelStyle.RaisedThick);
+
+    /// <summary>Whether the menu bar gets the flat 1px black rules above/below it (a Win 3.1 detail).
+    /// Off by default so other skins don't inherit that look.</summary>
+    public virtual bool DrawMenuSeparators => false;
+
+    /// <summary>The little square where a vertical and horizontal scrollbar meet. Default is a flat
+    /// Face fill; an art skin can blit a corner PNG.</summary>
+    public virtual void DrawScrollCorner(Win31Renderer r, Rectangle rect) => r.Fill(rect, Theme.Face);
+
+    /// <summary>A separator row in a popup menu, drawn within <paramref name="rect"/> (the full row).
+    /// Default is the classic 2px engraved groove (grey over white); an art skin can blit a strip.</summary>
+    public virtual void DrawMenuSeparator(Win31Renderer r, Rectangle rect)
+    {
+        int gy = rect.Y + rect.Height / 2;
+        r.HLine(rect.X + 2, gy, rect.Width - 4, Theme.MidEdge);
+        r.HLine(rect.X + 2, gy + 1, rect.Width - 4, Theme.LightEdge);
+    }
+
+    public virtual void DrawScrollButton(Win31Renderer r, Rectangle rect, ScrollArrowDir dir, bool pressed)
+    {
+        r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
+        var b = rect; if (pressed) b.Offset(1, 1);
+        int cx = b.X + b.Width / 2, cy = b.Y + b.Height / 2;
+        for (int i = 0; i < 4; i++)
+        {
+            int w = 1 + 2 * i;
+            switch (dir)
+            {
+                case ScrollArrowDir.Up: r.Fill(cx - i, cy + 1 - i, w, 1, Theme.Text); break;
+                case ScrollArrowDir.Down: r.Fill(cx - i, cy - 2 + i, w, 1, Theme.Text); break;
+                case ScrollArrowDir.Left: r.Fill(cx + 1 - i, cy - i, 1, w, Theme.Text); break;
+                case ScrollArrowDir.Right: r.Fill(cx - 2 + i, cy - i, 1, w, Theme.Text); break;
+            }
+        }
+    }
+
+    // Win 3.1 system box: a black-outlined white slot with a 1px bottom/right drop shadow.
+    private static void DrawSysGlyph(Win31Renderer r, Rectangle b)
+    {
+        int w = 12, h = 3;
+        int x = b.X + (b.Width - w) / 2, y = b.Y + (b.Height - h) / 2;
+        r.Fill(x + 1, y + h, w, 1, Theme.MidEdge);
+        r.Fill(x + w, y + 1, 1, h, Theme.MidEdge);
+        r.Fill(x, y, w, h, Theme.Text);
+        r.Fill(x + 1, y + 1, w - 2, 1, Theme.WindowBg);
+    }
+
+    private static void DrawMinGlyph(Win31Renderer r, Rectangle b)
+    {
+        int cx = b.X + b.Width / 2, cy = b.Y + b.Height / 2 + 1;
+        for (int i = 0; i < 4; i++) r.Fill(cx - 3 + i, cy - 3 + i, 7 - 2 * i, 1, Theme.Text);
+    }
+
+    private static void DrawMaxGlyph(Win31Renderer r, Rectangle b)
+    {
+        int cx = b.X + b.Width / 2, cy = b.Y + b.Height / 2 - 2;
+        for (int i = 0; i < 4; i++) r.Fill(cx - i, cy + i, 1 + 2 * i, 1, Theme.Text);
+    }
+
+    // Restore glyph: two overlapping little frames (shown when a window is maximized).
+    private static void DrawRestoreGlyph(Win31Renderer r, Rectangle b)
+    {
+        int mx = b.X + b.Width / 2, my = b.Y + b.Height / 2;
+        r.FrameRect(new Rectangle(mx - 1, my - 3, 5, 5), Theme.Text);
+        r.FrameRect(new Rectangle(mx - 3, my - 1, 5, 5), Theme.Face);
+        r.FrameRect(new Rectangle(mx - 3, my - 1, 5, 5), Theme.Text);
+    }
 }
+
+/// <summary>Which caption button (drives the glyph the skin draws).</summary>
+public enum CaptionButton { System, Minimize, Maximize, Restore }
+
+/// <summary>Scroll-arrow direction (drives the triangle the skin draws).</summary>
+public enum ScrollArrowDir { Up, Down, Left, Right }

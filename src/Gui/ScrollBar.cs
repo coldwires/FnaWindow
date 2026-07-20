@@ -134,35 +134,12 @@ public sealed class ScrollBar : Widget
         // Track dither.
         r.DrawDither(_track);
 
-        // Arrow buttons.
-        DrawArrow(r, _dec, _pressed == 0, dec: true);
-        DrawArrow(r, _inc, _pressed == 1, dec: false);
+        // Arrow buttons (routed through the skin so art can replace them).
+        var skin = ThemeManager.Skin;
+        skin.DrawScrollButton(r, _dec, Horizontal ? ScrollArrowDir.Left : ScrollArrowDir.Up, _pressed == 0);
+        skin.DrawScrollButton(r, _inc, Horizontal ? ScrollArrowDir.Right : ScrollArrowDir.Down, _pressed == 1);
 
         // Thumb.
         if (Active) r.DrawPanel(ThumbRect(), BevelStyle.RaisedThin, Theme.Face);
-    }
-
-    private void DrawArrow(Win31Renderer r, Rectangle rect, bool down, bool dec)
-    {
-        r.DrawPanel(rect, down ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
-        var b = rect;
-        if (down) b.Offset(1, 1);
-        int cx = b.X + b.Width / 2, cy = b.Y + b.Height / 2;
-
-        // Triangle pointing in the scroll direction (4px tall).
-        for (int i = 0; i < 4; i++)
-        {
-            int w = 1 + 2 * i;
-            if (Horizontal)
-            {
-                int x = dec ? cx + 1 - i : cx - 2 + i;
-                r.Fill(x, cy - i, 1, 1 + 2 * i, Theme.Text);
-            }
-            else
-            {
-                int y = dec ? cy + 1 - i : cy - 2 + i;
-                r.Fill(cx - i, y, w, 1, Theme.Text);
-            }
-        }
     }
 }

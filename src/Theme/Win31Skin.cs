@@ -23,12 +23,21 @@ public sealed class Win31Skin : Skin
         DrawBevel(r, rect, style);
     }
 
+    public override bool DrawMenuSeparators => true; // the 1px black rules around the menu bar
+
+    // The flat Win 3.1 window frame: black / face / face / black (not a raised 3D bevel).
+    public override void DrawWindowFrame(Win31Renderer r, Rectangle rect)
+    {
+        r.FrameRect(rect, Theme.Text);
+        r.FrameRect(Win31Renderer.Inset(rect, 3), Theme.Text);
+    }
+
     public override void DrawBevel(Win31Renderer r, Rectangle rect, BevelStyle style)
     {
         switch (style)
         {
             case BevelStyle.RaisedThin:
-                Edges(r, rect, Theme.LightEdge, Theme.DarkEdge);
+                Edges(r, rect, Theme.LightEdge, Theme.MidEdge); // 3.1 thin button: white / gray (not near-black)
                 break;
             case BevelStyle.SunkenThin: // inverse of RaisedThin
                 Edges(r, rect, Theme.MidEdge, Theme.LightEdge);
