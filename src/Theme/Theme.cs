@@ -33,6 +33,16 @@ public static class Theme
     public static Color SyntaxString   = Rgb(0x80, 0x00, 0x00); // string/char literals
     public static Color SyntaxComment  = Rgb(0x80, 0x80, 0x80); // comments
 
+    /// <summary>The faint band behind the caret's line in a text area. Derived from the palette (a
+    /// touch of the selection color mixed into the text background) so it follows a theme swap
+    /// instead of needing its own entry in every palette.</summary>
+    public static Color EditorCurrentLine => Mix(WindowBg, TitleActive, 0.10f);
+
+    private static Color Mix(Color a, Color b, float t) => new(
+        (int)(a.R + (b.R - a.R) * t),
+        (int)(a.G + (b.G - a.G) * t),
+        (int)(a.B + (b.B - a.B) * t));
+
     // ── Metrics ───────────────────────────────────────────────────────────
     // Height/size metrics come from the active skin (a bigger-font skin needs taller rows); the
     // defaults are the classic Win 3.1 values held in the Skin base. The rest are consts.
