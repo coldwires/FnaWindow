@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
@@ -18,6 +19,10 @@ namespace FnaWindow;
 /// <item><see cref="DrawOverlays"/> - over the whole widget (popups, tooltips).</item>
 /// <item><see cref="MouseIntercept"/> / <see cref="ClickIntercept"/> - take the mouse before the
 /// caret does.</item>
+/// <item><see cref="WordWrap"/> - lay long lines out over several rows. Everything below works in
+/// visual rows, so it is one code path either way; a subclass that positions anything itself
+/// should go through <see cref="PointFor"/> or <see cref="RowIndexOf"/> rather than assuming one
+/// row per line.</item>
 /// <item><see cref="OnBufferChanged"/> - react to an edit (the base keeps its own metrics current).</item>
 /// <item>Override <c>OnKey</c> / <c>OnChar</c> and call <c>base</c> for the plain behaviour, and
 /// override <see cref="EnterKey"/> / <see cref="Backspace"/> for smarter versions.</item>
@@ -47,6 +52,28 @@ public class TextArea : Widget
     /// <summary>Faint band across the caret's line when there is no selection.</summary>
     public bool HighlightCurrentLine = true;
 
+    /// <summary>
+    /// Wrap long lines to the width of the text region instead of scrolling sideways. The buffer is
+    /// untouched - no line breaks are inserted - so this is purely how the text is laid out: a
+    /// logical line becomes one or more visual rows, broken after a space where there is one and
+    /// mid-word only when a single word is wider than the widget. The horizontal scrollbar goes
+    /// away while it is on, and vertical motion (arrows, page keys, the wheel, Home/End) works in
+    /// visual rows, which is what makes wrapped text feel right.
+    /// </summary>
+    public bool WordWrap
+    {
+        get => _wordWrap;
+        set
+        {
+            if (_wordWrap == value) return;
+            _wordWrap = value;
+            ScrollCol = 0;
+            Layout();          // re-measures the text region, then rebuilds the rows for it
+            EnsureVisible();   // keep the caret on screen across the switch
+            Root()?.RequestRedraw();
+        }
+    }
+
     /// <summary>Raised when the caret moves, for a status bar showing Ln/Col.</summary>
     public Action<Position>? CaretMoved;
 
@@ -64,12 +91,27 @@ public class TextArea : Widget
 
     private Position _caret;
     private Position _anchor;              // selection anchor (== caret when there is no selection)
-    private int _goalCol;                  // the column a vertical move wants to land on
+    private int _goalCol;                  // the column WITHIN ITS ROW a vertical move wants
     private bool _verticalMove;            // true during a vertical move (keeps _goalCol)
     private bool _selecting;               // a drag-select is in progress
     private double _blink;
     private bool _blinkOn = true;
     private int _maxLineLen = 1;
+    private bool _wordWrap;
+
+    /// <summary>
+    /// One visual row: the slice [Start, End) of logical line <paramref name="Line"/> that occupies
+    /// a single screen row. With <see cref="WordWrap"/> off every line is exactly one row spanning
+    /// the whole line, so the one code path below serves both modes and there is no second,
+    /// wrap-only version of the caret, hit-test or draw logic to drift out of step.
+    /// </summary>
+    private readonly record struct VisRow(int Line, int Start, int End);
+
+    // Every visual row in the buffer, in order. ScrollLine indexes THIS list, not the line list.
+    private readonly List<VisRow> _rows = new();
+    // _firstRow[i] is the index of line i's first row; _firstRow[LineCount] == _rows.Count.
+    private int[] _firstRow = { 0, 0 };
+    private int _wrapWidth;                // the column width _rows was built for (0 = unwrapped)
 
     public TextArea(TextBuffer buffer)
     {
@@ -107,20 +149,18 @@ public class TextArea : Widget
     /// <summary>Drawn behind one line's text, before the current-line band and the selection.</summary>
     protected virtual void DrawLineBackground(Win31Renderer r, int line, int y) { }
 
-    /// <summary>Drawn over one line's text (squiggles and the like).</summary>
-    protected virtual void DrawLineOverlay(Win31Renderer r, int line, string text, int y) { }
+    /// <summary>Drawn over one line's text (squiggles and the like). <paramref name="firstCol"/> and
+    /// <paramref name="lastCol"/> are the columns actually on screen in this row - clip to them, or
+    /// a wrapped line draws its overlay across every one of its rows.</summary>
+    protected virtual void DrawLineOverlay(Win31Renderer r, int line, string text, int y,
+                                           int firstCol, int lastCol) { }
 
     /// <summary>Drawn over the whole widget, after the scrollbars (popups, tooltips).</summary>
     protected virtual void DrawOverlays(Win31Renderer r) { }
 
-    /// <summary>Called after every edit. The base keeps the horizontal scroll extent current;
+    /// <summary>Called after every edit. The base rebuilds the visual rows and the scroll extent;
     /// override (and call base) to update any per-line state of your own.</summary>
-    protected virtual void OnBufferChanged(TextChange change)
-    {
-        _maxLineLen = 1;
-        for (int i = 0; i < Buf.LineCount; i++)
-            _maxLineLen = Math.Max(_maxLineLen, Buf.LineLength(i) + 1);
-    }
+    protected virtual void OnBufferChanged(TextChange change) => BuildRows();
 
     /// <summary>Take the mouse before the caret does; return true to consume this frame's mouse.</summary>
     protected virtual bool MouseIntercept(InputState input) => false;
@@ -130,6 +170,68 @@ public class TextArea : Widget
 
     /// <summary>Called after the caret moves, before <see cref="CaretMoved"/>.</summary>
     protected virtual void OnCaretMoved() { }
+
+    // -- Visual rows -------------------------------------------------------
+
+    /// <summary>
+    /// Rebuilds the row list. Unwrapped that is one row per line; wrapped, each line is cut into
+    /// screen-width pieces. Runs on every edit and whenever the usable width changes, walking the
+    /// whole buffer - the same cost the horizontal scroll extent already had.
+    /// </summary>
+    private void BuildRows()
+    {
+        // Before the first Layout there is no real width to wrap to; stay unwrapped until there is
+        // (Layout rebuilds the moment it knows better).
+        int width = _wordWrap && VisCols > 1 ? VisCols : 0;
+        _wrapWidth = width;
+
+        _rows.Clear();
+        int n = Buf.LineCount;
+        if (_firstRow.Length < n + 1) _firstRow = new int[n + 1];
+        _maxLineLen = 1;
+
+        for (int i = 0; i < n; i++)
+        {
+            _firstRow[i] = _rows.Count;
+            string line = Buf.Line(i);
+            _maxLineLen = Math.Max(_maxLineLen, line.Length + 1);
+
+            if (width == 0 || line.Length <= width) { _rows.Add(new VisRow(i, 0, line.Length)); continue; }
+
+            int start = 0;
+            while (start < line.Length)
+            {
+                int end = Math.Min(line.Length, start + width);
+                if (end < line.Length) end = BreakAt(line, start, end);
+                _rows.Add(new VisRow(i, start, end));
+                start = end;
+            }
+        }
+        _firstRow[n] = _rows.Count;
+    }
+
+    /// <summary>Where to cut a too-long row: just after the last space in it, so words stay whole.
+    /// A single word wider than the widget has no break to find and is cut at the edge.</summary>
+    private static int BreakAt(string line, int start, int hardEnd)
+    {
+        for (int i = hardEnd; i > start; i--)
+            if (line[i - 1] == ' ' || line[i - 1] == '\t') return i;
+        return hardEnd;
+    }
+
+    /// <summary>The index into the row list of the row the position sits on. A position exactly on a
+    /// wrap point belongs to the row that follows, which is where the caret is drawn.</summary>
+    protected int RowIndexOf(Position p)
+    {
+        int line = Math.Clamp(p.Line, 0, Buf.LineCount - 1);
+        int first = _firstRow[line], last = _firstRow[line + 1] - 1;
+        for (int i = first; i < last; i++)
+            if (p.Col < _rows[i].End) return i;
+        return last;
+    }
+
+    /// <summary>Total visual rows in the buffer - the vertical scroll extent.</summary>
+    protected int RowCount => _rows.Count;
 
     // -- Layout ------------------------------------------------------------
 
@@ -142,15 +244,25 @@ public class TextArea : Widget
         var inner = Win31Renderer.Inset(Well, Win31Renderer.Thickness(BevelStyle.SunkenThick));
         int t = Theme.ScrollBarThickness;
 
-        VBar.Bounds = new Rectangle(inner.Right - t, inner.Y, t, inner.Height - t);
-        HBar.Bounds = new Rectangle(inner.X, inner.Bottom - t, inner.Width - t, t);
+        // Wrapped text never scrolls sideways, so the horizontal bar goes away and both the text
+        // region and the vertical bar take the strip it would have used.
+        HBar.Visible = !_wordWrap;
+        int bottomStrip = HBar.Visible ? t : 0;
+
+        VBar.Bounds = new Rectangle(inner.Right - t, inner.Y, t, inner.Height - bottomStrip);
+        HBar.Bounds = HBar.Visible
+            ? new Rectangle(inner.X, inner.Bottom - t, inner.Width - t, t)
+            : Rectangle.Empty;
         VBar.Layout(); HBar.Layout();
 
-        TextRect = new Rectangle(inner.X, inner.Y, inner.Width - t, inner.Height - t);
+        TextRect = new Rectangle(inner.X, inner.Y, inner.Width - t, inner.Height - bottomStrip);
         OriginX = TextRect.X + Theme.EditorPaddingLeft;
         OriginY = TextRect.Y + Theme.EditorPaddingTop;
         VisLines = Math.Max(1, (TextRect.Bottom - OriginY) / CellH);
         VisCols = Math.Max(1, (TextRect.Right - OriginX) / CellW);
+
+        // A resize changes how the text wraps, so the rows have to follow the width.
+        if (_wrapWidth != (_wordWrap && VisCols > 1 ? VisCols : 0)) BuildRows();
     }
 
     // -- Update ------------------------------------------------------------
@@ -162,7 +274,7 @@ public class TextArea : Widget
         if (!MouseBlocked)
         {
             VBar.Update(input, t);
-            HBar.Update(input, t);
+            if (HBar.Visible) HBar.Update(input, t);
         }
 
         _blink += t.ElapsedGameTime.TotalMilliseconds;
@@ -174,10 +286,11 @@ public class TextArea : Widget
 
     private void SyncScrollbars()
     {
-        VBar.ContentSize = Buf.LineCount;
+        VBar.ContentSize = _rows.Count;   // rows, not lines: one wrapped line can be several
         VBar.ViewSize = VisLines;
         VBar.Value = ScrollLine = Math.Clamp(ScrollLine, 0, VBar.MaxValue);
 
+        if (!HBar.Visible) { ScrollCol = 0; return; }
         HBar.ContentSize = _maxLineLen;
         HBar.ViewSize = VisCols;
         HBar.Value = ScrollCol = Math.Clamp(ScrollCol, 0, HBar.MaxValue);
@@ -190,7 +303,7 @@ public class TextArea : Widget
 
         if (MouseIntercept(input)) return;
 
-        if (input.LeftPressed && inText && !VBar.Bounds.Contains(m) && !HBar.Bounds.Contains(m))
+        if (input.LeftPressed && inText && !VBar.Bounds.Contains(m) && !(HBar.Visible && HBar.Bounds.Contains(m)))
         {
             Root()?.SetFocus(this);
             OnActivate?.Invoke();
@@ -262,8 +375,10 @@ public class TextArea : Widget
         if (input.Pressed(Keys.Right)) { Move(ctrl ? WordRight(_caret) : HStepRight(_caret), shift); return; }
         if (input.Pressed(Keys.Up))    { MoveV(-1, shift); return; }
         if (input.Pressed(Keys.Down))  { MoveV(+1, shift); return; }
-        if (input.Pressed(Keys.Home))  { Move(ctrl ? new Position(0, 0) : new Position(_caret.Line, 0), shift); return; }
-        if (input.Pressed(Keys.End))   { Move(ctrl ? Buf.End() : new Position(_caret.Line, Buf.LineLength(_caret.Line)), shift); return; }
+        // Home/End work on the visual row, so on a wrapped line they go to the ends of the row you
+        // can see. Unwrapped a row is the whole line, so this is the classic behaviour.
+        if (input.Pressed(Keys.Home)) { Move(ctrl ? new Position(0, 0) : RowStart(), shift); return; }
+        if (input.Pressed(Keys.End))  { Move(ctrl ? Buf.End() : RowEnd(), shift); return; }
         if (input.Pressed(Keys.PageUp))   { MoveV(-VisLines, shift); return; }
         if (input.Pressed(Keys.PageDown)) { MoveV(+VisLines, shift); return; }
 
@@ -483,15 +598,40 @@ public class TextArea : Widget
         return new Position(p.Line, c);
     }
 
-    // Vertical move that preserves the goal column (the column the caret "wants"), so passing
-    // through short lines and back returns to the same column instead of shrinking each time.
-    protected void MoveV(int dLines, bool extend)
+    // Vertical move by VISUAL rows, preserving the goal column (the column within the row that the
+    // caret "wants"), so passing through short rows and back returns to the same screen column
+    // instead of shrinking each time. Unwrapped a row is a whole line, so this is line motion.
+    protected void MoveV(int dRows, bool extend)
     {
         _verticalMove = true;
-        int line = Math.Clamp(_caret.Line + dLines, 0, Buf.LineCount - 1);
-        int col = Math.Min(_goalCol, Buf.LineLength(line));
-        Move(new Position(line, col), extend);
+        int ri = Math.Clamp(RowIndexOf(_caret) + dRows, 0, _rows.Count - 1);
+        var row = _rows[ri];
+        int col = Math.Min(row.Start + _goalCol, row.End);
+        Move(new Position(row.Line, col), extend);
         _verticalMove = false;
+    }
+
+    /// <summary>The first column of the caret's visual row.</summary>
+    private Position RowStart()
+    {
+        var row = _rows[RowIndexOf(_caret)];
+        return new Position(row.Line, row.Start);
+    }
+
+    /// <summary>The last column of the caret's visual row. On a wrapped row that stops before the
+    /// space the break was made at, so End does not land the caret on the row below.</summary>
+    private Position RowEnd()
+    {
+        int ri = RowIndexOf(_caret);
+        var row = _rows[ri];
+        int end = row.End;
+        bool wrapped = end < Buf.LineLength(row.Line);
+        if (wrapped)
+        {
+            string line = Buf.Line(row.Line);
+            while (end > row.Start && (line[end - 1] == ' ' || line[end - 1] == '\t')) end--;
+        }
+        return new Position(row.Line, end);
     }
 
     protected Position WordLeft(Position p)
@@ -538,24 +678,33 @@ public class TextArea : Widget
     /// <summary>The buffer position under a screen point.</summary>
     protected Position PosFromMouse(Point m)
     {
-        int line = Math.Clamp(ScrollLine + (m.Y - OriginY) / CellH, 0, Buf.LineCount - 1);
-        if (m.Y < OriginY) line = Math.Max(0, ScrollLine);
+        int ri = Math.Clamp(ScrollLine + (m.Y - OriginY) / CellH, 0, _rows.Count - 1);
+        if (m.Y < OriginY) ri = Math.Clamp(ScrollLine, 0, _rows.Count - 1);
+        var row = _rows[ri];
         int rel = (int)Math.Round((double)(m.X - OriginX) / CellW);
-        int col = Math.Clamp(ScrollCol + Math.Max(0, rel), 0, Buf.LineLength(line));
-        return new Position(line, col);
+        int col = Math.Clamp(row.Start + ScrollCol + Math.Max(0, rel), row.Start, row.End);
+        return new Position(row.Line, col);
     }
 
     /// <summary>The screen point of a cell's top-left corner (off-screen values are legal).</summary>
     protected Point PointFor(Position p)
-        => new(OriginX + (p.Col - ScrollCol) * CellW, OriginY + (p.Line - ScrollLine) * CellH);
+    {
+        int ri = RowIndexOf(p);
+        var row = _rows[ri];
+        return new Point(OriginX + (p.Col - row.Start - ScrollCol) * CellW,
+                         OriginY + (ri - ScrollLine) * CellH);
+    }
 
     protected void EnsureVisible()
     {
-        if (_caret.Line < ScrollLine) ScrollLine = _caret.Line;
-        else if (_caret.Line >= ScrollLine + VisLines) ScrollLine = _caret.Line - VisLines + 1;
+        int ri = RowIndexOf(_caret);
+        if (ri < ScrollLine) ScrollLine = ri;
+        else if (ri >= ScrollLine + VisLines) ScrollLine = ri - VisLines + 1;
+        ScrollLine = Math.Max(0, ScrollLine);
+
+        if (!HBar.Visible) { ScrollCol = 0; return; } // wrapped text never scrolls sideways
         if (_caret.Col < ScrollCol) ScrollCol = _caret.Col;
         else if (_caret.Col >= ScrollCol + VisCols) ScrollCol = _caret.Col - VisCols + 1;
-        ScrollLine = Math.Max(0, ScrollLine);
         ScrollCol = Math.Max(0, ScrollCol);
     }
 
@@ -563,8 +712,8 @@ public class TextArea : Widget
 
     private void NotifyCaret()
     {
-        // Any non-vertical caret move re-arms the goal column to the caret's current column.
-        if (!_verticalMove) _goalCol = _caret.Col;
+        // Any non-vertical caret move re-arms the goal column to the caret's column within its row.
+        if (!_verticalMove) _goalCol = _caret.Col - _rows[RowIndexOf(_caret)].Start;
         OnCaretMoved();
         CaretMoved?.Invoke(_caret);
     }
@@ -578,65 +727,79 @@ public class TextArea : Widget
         var (selA, selB) = Sel();
         bool hasSel = HasSel;
         var font = FontOverride ?? r.EditorFont;
+        int caretRow = RowIndexOf(_caret);
 
-        for (int row = 0; row < VisLines; row++)
+        // ColorLine is asked once per LINE, not once per row: consecutive rows of a wrapped line
+        // share one answer, and a colorizer can be expensive.
+        Color[]? colors = null;
+        int coloredLine = -1;
+
+        for (int screenRow = 0; screenRow < VisLines; screenRow++)
         {
-            int li = ScrollLine + row;
-            if (li >= Buf.LineCount) break;
-            string line = Buf.Line(li);
-            int y = OriginY + row * CellH;
+            int ri = ScrollLine + screenRow;
+            if (ri >= _rows.Count) break;
+            var row = _rows[ri];
+            string line = Buf.Line(row.Line);
+            int y = OriginY + screenRow * CellH;
 
-            DrawLineBackground(r, li, y);
+            DrawLineBackground(r, row.Line, y);
 
-            // Current-line band, under the selection and the text.
-            if (HighlightCurrentLine && li == _caret.Line && !hasSel)
+            // Current-line band, under the selection and the text. On a wrapped line it covers
+            // every row of that line, so "the line you are editing" still reads as one block.
+            if (HighlightCurrentLine && row.Line == _caret.Line && !hasSel)
                 r.Fill(TextRect.X, y, TextRect.Width, CellH, Theme.EditorCurrentLine);
 
-            var colors = ColorLine(li, line);
+            if (coloredLine != row.Line) { colors = ColorLine(row.Line, line); coloredLine = row.Line; }
 
-            // Selection band for this line.
+            // The columns of this row that are actually on screen. Wrapped, ScrollCol is 0 and the
+            // row is already screen-width; unwrapped, the row is the whole line and ScrollCol pans.
+            int firstCol = row.Start + ScrollCol;
+            int lastCol = Math.Min(row.End, firstCol + VisCols);
+
+            // Selection band for this row.
             int selFrom = -1, selTo = -1;
-            if (hasSel && li >= selA.Line && li <= selB.Line)
+            if (hasSel && row.Line >= selA.Line && row.Line <= selB.Line)
             {
-                selFrom = li == selA.Line ? selA.Col : 0;
-                selTo = li == selB.Line ? selB.Col : line.Length;
-                int vf = Math.Max(selFrom, ScrollCol);
-                int vt = Math.Min(selTo, ScrollCol + VisCols);
+                selFrom = row.Line == selA.Line ? selA.Col : 0;
+                selTo = row.Line == selB.Line ? selB.Col : line.Length;
+                int vf = Math.Max(selFrom, firstCol);
+                int vt = Math.Min(selTo, lastCol);
                 if (vt > vf)
                 {
-                    int x = OriginX + (vf - ScrollCol) * CellW;
+                    int x = OriginX + (vf - row.Start - ScrollCol) * CellW;
                     r.Fill(x, y, (vt - vf) * CellW, CellH, Theme.TitleActive);
                 }
             }
 
-            int firstCol = ScrollCol;
-            int lastCol = Math.Min(line.Length, ScrollCol + VisCols);
             for (int ci = firstCol; ci < lastCol; ci++)
             {
                 char ch = line[ci];
                 if (ch == ' ') continue;
-                int x = OriginX + (ci - ScrollCol) * CellW;
+                int x = OriginX + (ci - row.Start - ScrollCol) * CellW;
                 bool sel = ci >= selFrom && ci < selTo;
                 Color c = sel ? Theme.TitleText : (colors != null ? colors[ci] : Theme.Text);
                 font.Draw(r.Sb, ch.ToString(), x, y, c);
             }
 
-            DrawLineOverlay(r, li, line, y);
+            DrawLineOverlay(r, row.Line, line, y, firstCol, lastCol);
 
             // Caret - the traditional thick underline, 2px tall spanning the cell.
-            if (Focused && _blinkOn && _caret.Line == li)
+            if (Focused && _blinkOn && ri == caretRow)
             {
-                int cx = OriginX + (_caret.Col - ScrollCol) * CellW;
-                if (_caret.Col >= ScrollCol && _caret.Col <= ScrollCol + VisCols)
+                int cx = OriginX + (_caret.Col - row.Start - ScrollCol) * CellW;
+                if (_caret.Col >= firstCol && _caret.Col <= firstCol + VisCols)
                     r.Fill(cx, y + CellH - 2, CellW, 2, Theme.Text);
             }
         }
 
         VBar.Draw(r);
-        HBar.Draw(r);
-        // The corner square between the two scrollbars (skin-drawn: Face fill by default, or art).
-        ThemeManager.Skin.DrawScrollCorner(r,
-            new Rectangle(VBar.Bounds.X, HBar.Bounds.Y, Theme.ScrollBarThickness, Theme.ScrollBarThickness));
+        if (HBar.Visible)
+        {
+            HBar.Draw(r);
+            // The corner square between the two scrollbars (skin-drawn: Face fill by default, or art).
+            ThemeManager.Skin.DrawScrollCorner(r,
+                new Rectangle(VBar.Bounds.X, HBar.Bounds.Y, Theme.ScrollBarThickness, Theme.ScrollBarThickness));
+        }
 
         DrawOverlays(r);
     }
