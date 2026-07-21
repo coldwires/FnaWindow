@@ -2,7 +2,7 @@
 
 Build desktop apps with fully custom chrome on FNA. The OS title bar and border are removed, but the window still drags, resizes from any edge, maximizes, and snaps like a normal one.
 
-It comes with a complete Windows 3.1 look as the default: authored 9-slice chrome art, the 3.1 cursor set, and the bold chrome font, all applied for you. That look is just a palette plus a renderer, so you can draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a text editor, a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
+It comes with a complete Windows 3.1 look as the default: authored 9-slice chrome art, the 3.1 cursor set, and the bold chrome font, all applied for you. That look is a palette plus a swappable skin, so you can recolour it, replace the art, or draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a text editor, a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
 
 ![demo](docs/demo.png)
 
@@ -21,10 +21,13 @@ The borderless path is Windows-only. On macOS and Linux the window falls back to
 ## Quick start
 
 ```sh
-git clone <your-repo-url> fna-custom-window
+git clone https://github.com/coldwires/FnaWindow fna-custom-window
 cd fna-custom-window
 dotnet run --project Demo
 ```
+
+No setup step: FNA and the native libraries are vendored here, and the engine has no submodules of
+its own. (An app that *consumes* the engine does need one - see below.)
 
 You'll get the demo window above: drag it, resize the edges, and try the **Themes** menu.
 
@@ -46,7 +49,7 @@ Add the engine as a git submodule and reference the library project. Base fixes 
 
 ```sh
 # in your new app's repo
-git submodule add <your-repo-url> engine
+git submodule add https://github.com/coldwires/FnaWindow engine
 ```
 
 ```xml
@@ -57,6 +60,18 @@ git submodule add <your-repo-url> engine
 ```
 
 That single reference pulls in the engine, FNA, the native libraries, and the fonts. See **[templates/starter-app/](templates/starter-app/)** for a short starter you can copy, and **[docs/EXTENDING.md](docs/EXTENDING.md#consuming-the-engine-as-a-git-submodule)** for the full workflow (updating, pinning, and the non-submodule option).
+
+**Give your app a setup step.** A submodule is a pointer, not a copy: anyone who clones your app the
+normal way gets an empty `engine/` folder and a build that fails with confusing errors about
+`Microsoft.Xna` not existing. Either clone with `--recurse-submodules`, or ship a one-line script so
+nobody has to remember:
+
+```sh
+git submodule update --init --recursive
+```
+
+Setting `git config --global submodule.recurse true` once per machine makes every clone and pull do
+this automatically, for every repo.
 
 ## Build your own app
 
