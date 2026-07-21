@@ -19,7 +19,7 @@ public sealed class WindowFrame : Widget
     public StatusBar? Status { get; private set; }
     public Widget? Content { get; private set; }
 
-    private InputDialog? _dialog, _pending;
+    private Widget? _dialog, _pending;
 
     public WindowFrame() { Add(Title); }
 
@@ -27,9 +27,11 @@ public sealed class WindowFrame : Widget
     public void SetStatus(StatusBar status) { Status = status; Add(status); }
     public void SetContent(Widget content) { Content = content; Add(content); }
 
-    /// <summary>Show a modal dialog (centered, driven here). Safe to call from a menu item - it
-    /// opens after the update loop so the closing menu can't clobber it. Use OnOk/OnCancel to close.</summary>
-    public void ShowDialog(InputDialog dialog) => _pending = dialog;
+    /// <summary>Show a modal dialog - any widget that lays itself out over the frame, such as
+    /// <see cref="InputDialog"/> or <see cref="RetroFileDialog"/>. It is centered and driven here.
+    /// Safe to call from a menu item: it opens after the update loop so the closing menu cannot
+    /// clobber it. Give the dialog this frame's Bounds and close it from its own OnOk/OnCancel.</summary>
+    public void ShowDialog(Widget dialog) => _pending = dialog;
 
     public void CloseDialog()
     {
