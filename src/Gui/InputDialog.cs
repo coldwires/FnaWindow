@@ -12,6 +12,8 @@ namespace FnaWindow;
 /// <para>Two flags trim it down: <see cref="NoField"/> drops the text field, for a confirm or a
 /// message; <see cref="OkOnly"/> drops the Cancel button and centres OK, for an About box or a
 /// notice where there is nothing to cancel. Set both for a plain message box.</para>
+/// <para>Setting <see cref="AltLabel"/> adds a third button between OK and Cancel, for the classic
+/// three-way prompt (Save / Discard / Cancel when closing a modified file).</para>
 /// </summary>
 public sealed class InputDialog : Widget
 {
@@ -27,6 +29,7 @@ public sealed class InputDialog : Widget
     private Rectangle _titleRect, _fieldRect;
 
     private readonly PushButton _ok = new("OK");
+    private readonly PushButton _alt = new("");
     private readonly PushButton _cancel = new("Cancel");
     private readonly TitleDrag _drag = new();
 
@@ -35,6 +38,10 @@ public sealed class InputDialog : Widget
     public bool NoField;                                  // confirm-only (no text field)
     public bool OkOnly;                                   // single button, centred (About, notices)
     public string OkLabel = "OK", CancelLabel = "Cancel";
+
+    /// <summary>Label for an optional third button; null (the default) leaves it off.</summary>
+    public string? AltLabel;
+    public Action? OnAlt;
 
     public InputDialog(string title, string prompt, string initial)
     {
@@ -78,14 +85,16 @@ public sealed class InputDialog : Widget
 
         _ok.Label = OkLabel;
         _cancel.Label = CancelLabel;
+        _alt.Label = AltLabel ?? "";
         if (OkOnly)
         {
             _ok.Bounds = new Rectangle(x + (W - 72) / 2, y + buttonsTop, 72, 22);
-            _cancel.Bounds = Rectangle.Empty;
+            _alt.Bounds = _cancel.Bounds = Rectangle.Empty;
         }
         else
         {
-            _ok.Bounds = new Rectangle(x + W - 168, y + buttonsTop, 72, 22);
+            _ok.Bounds = new Rectangle(x + W - (AltLabel != null ? 248 : 168), y + buttonsTop, 72, 22);
+            _alt.Bounds = AltLabel != null ? new Rectangle(x + W - 168, y + buttonsTop, 72, 22) : Rectangle.Empty;
             _cancel.Bounds = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
         }
     }
@@ -121,6 +130,7 @@ public sealed class InputDialog : Widget
 
         // Buttons act on release, showing pressed while held.
         if (_ok.Update(input)) { OnOk?.Invoke(_text); return; }
+        if (!OkOnly && AltLabel != null && _alt.Update(input)) { OnAlt?.Invoke(); return; }
         if (!OkOnly && _cancel.Update(input)) { OnCancel?.Invoke(); return; }
     }
 
@@ -155,7 +165,11 @@ public sealed class InputDialog : Widget
         }
 
         _ok.Draw(r);
-        if (!OkOnly) _cancel.Draw(r);
+        if (!OkOnly)
+        {
+            if (AltLabel != null) _alt.Draw(r);
+            _cancel.Draw(r);
+        }
     }
 
     public override Widget? HitTest(Point p) => Bounds.Contains(p) ? this : null;
