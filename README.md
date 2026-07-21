@@ -2,7 +2,7 @@
 
 Build desktop apps with fully custom chrome on FNA. The OS title bar and border are removed, but the window still drags, resizes from any edge, maximizes, and snaps like a normal one.
 
-It comes with a Windows 3.1 style theme (title bar, menus, bevels) as the default look. That look is just a palette plus a renderer, so you can draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
+It comes with a Windows 3.1 style theme (title bar, menus, bevels) as the default look. That look is just a palette plus a renderer, so you can draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a text editor, a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
 
 ![demo](docs/demo.png)
 
@@ -11,7 +11,8 @@ It comes with a Windows 3.1 style theme (title bar, menus, bevels) as the defaul
 Building a custom-chrome desktop window normally means fighting the OS. This engine handles that part for you:
 
 - **Borderless with native behavior.** The OS frame is stripped (`WS_POPUP`), and drag, edge-resize, snap, and maximize still work because the window answers `WM_NCHITTEST` (the title bar acts as the caption). There is no moving-the-window-from-the-game-loop workaround.
-- **Retained-mode widget toolkit.** A small `Widget` tree with a from-scratch Win 3.1 renderer (a two-function bevel system), bitmap fonts, menus, scrollbars, modal dialogs, and popups.
+- **Retained-mode widget toolkit.** A small `Widget` tree with a from-scratch Win 3.1 renderer (a two-function bevel system), bitmap fonts, menus, scrollbars, modal dialogs, popups, and an Open / Save As file dialog.
+- **Text editing included.** `TextArea` is a complete editing widget: caret and selection, both scrollbars, undo/redo, the system clipboard, word wrap, and the standard key and mouse model. It knows nothing about languages, and it leaves hooks so a code editor can add coloring, squiggles and completion popups by subclassing rather than by reimplementing any of it.
 - **Runtime theming.** Swap the whole palette while the app runs. Windows 3.1, Midnight, and Slate ship with it, and adding one is a single record literal.
 - **Self-contained.** FNA and its native libraries are vendored under `lib/`, so you can clone and build with no extra setup.
 
@@ -31,7 +32,7 @@ You'll get the demo window above: drag it, resize the edges, and try the **Theme
 
 ```
 FnaWindow.csproj     the engine, a class library (this is what you reference)
-src/                 engine source: Gui/ Window/ Theme/
+src/                 engine source: Gui/ Window/ Theme/ Editor/
 Content/  lib/       vendored fonts, FNA, and its native libs
 Demo/                a runnable example app that references the library
 templates/           copy-paste starter for a new build-on (git-submodule wiring)
@@ -106,8 +107,12 @@ The base class handles the borderless window, native drag and resize, the render
 | `WindowChrome` | Win32/SDL interop: strip the frame, answer hit-tests, move/resize helpers. |
 | `Win31Renderer` | Fills, bevels (`Raised/SunkenThin/Thick`), panels, text, dither, mnemonics. |
 | `Widget` / `RootDesktop` / `PopupLayer` | Retained-mode tree, focus, top-most popups. |
-| `TitleBar` `MenuBar` `Toolbar` `ScrollBar` `StatusBar` `InputDialog` | The stock widgets. |
+| `TitleBar` `MenuBar` `Toolbar` `ScrollBar` `StatusBar` | The stock widgets. |
+| `InputDialog` / `RetroFileDialog` | Modal prompt, confirm and message boxes; a Win 3.1 Open / Save As dialog that browses directories off the render thread. |
+| `TextArea` / `TextBuffer` | Multi-line text editing: caret, selection, undo/redo, clipboard, word wrap, key and mouse model, with seams for a richer editor to subclass. |
+| `Clipboard` / `Tabs` | System clipboard text with an in-process fallback; tab-to-space expansion at tab stops. |
 | `Theme` / `ThemeManager` / `Palette` | Mutable palette plus runtime theme switching. |
+| `MainThread` | Post background-thread results back to the render thread. |
 
 ## Docs
 
@@ -115,7 +120,7 @@ See **[docs/EXTENDING.md](docs/EXTENDING.md)** for the full guide: custom widget
 
 ## Fonts
 
-Two bitmap-font atlases live in `Content/fonts/` (a proportional MS Sans Serif style UI font and a Fixedsys style monospace font), each a PNG plus a JSON glyph map. Swap in your own by matching that format.
+Four bitmap-font atlases live in `Content/fonts/`: a proportional MS Sans Serif style UI font in regular and bold, a larger bold cut for chrome, and a Fixedsys style monospace font for text areas. Each is a PNG plus a JSON glyph map. Swap in your own by matching that format.
 
 ## License
 

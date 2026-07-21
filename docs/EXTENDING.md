@@ -194,7 +194,7 @@ frame.SetMenu(new MenuBar(new List<TopMenu> { new("&File", file), new("&Help", h
 
 ## Modal dialogs
 
-`InputDialog` is a Win 3.1 message/prompt box. Use `frame.ShowDialog(...)`. It is **safe to call from a menu item**: it opens after the update loop, so the closing menu can't clobber it.
+`frame.ShowDialog(...)` takes **any** widget that lays itself out over the frame, and drives it for you. It is **safe to call from a menu item**: the dialog opens after the update loop, so the closing menu can't clobber it. Two dialogs ship with the engine, `InputDialog` (prompt, confirm, message) and `RetroFileDialog` (Open / Save As).
 
 ```csharp
 // Text prompt
@@ -213,7 +213,62 @@ frame.ShowDialog(new InputDialog("About", "MyApp\nv1.0", "")
 });
 ```
 
+Set `AltLabel` and `OnAlt` for a third button, which is what a Save / Discard / Cancel prompt needs:
+
+```csharp
+frame.ShowDialog(new InputDialog("MyApp", "Save changes to " + name + "?", "")
+{
+    NoField = true, OkLabel = "Save", AltLabel = "Discard", CancelLabel = "Cancel",
+    Bounds = frame.Bounds,
+    OnOk = _ => { frame.CloseDialog(); Save(); },
+    OnAlt = () => { frame.CloseDialog(); Discard(); },
+    OnCancel = frame.CloseDialog,
+});
+```
+
 The dialog auto-sizes its height to the prompt and centers itself.
+
+`RetroFileDialog` picks a path. It browses directories and drives, filters by pattern, and reads each directory on a background thread so a slow network path cannot freeze the window:
+
+```csharp
+var dlg = new RetroFileDialog(save: false, pattern: "*.txt;*.*", initialDir: null, defaultName: null)
+{
+    Bounds = frame.Bounds,
+};
+dlg.OnOk = path => { frame.CloseDialog(); Open(path); };
+dlg.OnCancel = frame.CloseDialog;
+frame.ShowDialog(dlg);
+```
+
+---
+
+## Text areas
+
+`TextArea` is a complete multi-line editor: a sunken well over a fixed monospace grid, with a caret, selection, both scrollbars, undo/redo, the system clipboard, word motion, and word wrap. Give it a `TextBuffer` and put it in the frame:
+
+```csharp
+var buffer = new TextBuffer(File.ReadAllText(path));
+var text = new TextArea(buffer) { WordWrap = true };
+text.CaretMoved += p => status.RightCells = new[] { $"Ln {p.Line + 1}, Col {p.Col + 1}" };
+frame.SetContent(text);
+```
+
+`TextBuffer` is the model and is usable on its own: line-based, edits are range replacements, every edit bumps `Version` and raises `Changed` with the range that changed, and undo/redo coalesces typing into word-sized groups. `Tabs.Expand` turns hard tabs into spaces at tab stops, which is worth doing on load and on paste since the grid is one cell per character.
+
+### Subclassing it
+
+Anything language-specific (syntax coloring, error squiggles, completion popups) is added by subclassing rather than by copying the widget. Each hook has a plain default, so you override only what you need:
+
+| Hook | For |
+|---|---|
+| `ColorLine(line, text)` | Per-character colors for one line; null means plain `Theme.Text`. |
+| `DrawLineBackground` / `DrawLineOverlay` | Behind and over one row's text. The overlay gets the row's visible column span, so clip to it. |
+| `DrawOverlays` | Over the whole widget, after the scrollbars: popups and tooltips. |
+| `MouseIntercept` / `ClickIntercept` | Take the mouse before the caret does. |
+| `OnBufferChanged` / `OnCaretMoved` | React to an edit or a caret move. |
+| `EnterKey` / `Backspace` / `DeleteKey` | Smarter versions; override `OnKey`/`OnChar` and call `base` for everything else. |
+
+One thing to know before you position anything yourself: **the widget works in visual rows, not lines.** With wrap off each line is exactly one row, so the two modes share one code path, but `ScrollLine` is a row index either way. Use `PointFor(position)` and `RowIndexOf(position)` to place your own popups instead of computing `line - ScrollLine`, and your code keeps working when wrap is switched on.
 
 ---
 
