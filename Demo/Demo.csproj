@@ -7,7 +7,7 @@
   -->
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>  <!-- GUI subsystem: Exe would open a console window alongside -->
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>FnaWindow.Demo</RootNamespace>
     <AssemblyName>FnaWindowDemo</AssemblyName>
