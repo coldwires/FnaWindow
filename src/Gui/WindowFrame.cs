@@ -88,7 +88,11 @@ public sealed class WindowFrame : Widget
     {
         r.Fill(Bounds, Theme.Face);                    // frame + body background
         base.Draw(r);                                   // inset children draw over it
-        r.DrawBevel(Bounds, BevelStyle.RaisedThick);    // raised outer window frame
+        // The outer frame comes from the active skin, not a hardcoded bevel: the Win 3.1 frame is
+        // flat black/face/face/black, and an art skin replaces it with a 9-slice PNG. Drawing a
+        // RaisedThick bevel here instead is why an app on this frame did not match one with its own
+        // custom frame, which has always called this.
+        ThemeManager.Skin.DrawWindowFrame(r, Bounds);
         DrawSizeGrip(r);
     }
 
