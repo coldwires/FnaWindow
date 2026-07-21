@@ -40,7 +40,8 @@ public sealed class RootDesktop : Widget
     {
         // The content tree always updates; the widget that owns the open popup
         // (e.g. MenuBar) drives the popup itself. Other widgets consult
-        // Popup.IsOpen to know the mouse is captured and ignore it.
+        // Popup.BlocksInput to know the mouse is captured and ignore it.
+        Popup.BeginFrame(); // a popup closed last frame stops swallowing input now
         base.Update(input, t);
 
         // Route typed characters + keys to the focused widget, unless a popup owns input.

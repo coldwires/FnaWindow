@@ -24,7 +24,11 @@ public sealed class InputDialog : Widget
     private double _blinkMs;
     private bool _caretOn = true;
 
-    private Rectangle _titleRect, _fieldRect, _okRect, _cancelRect;
+    private Rectangle _titleRect, _fieldRect;
+
+    private readonly PushButton _ok = new("OK");
+    private readonly PushButton _cancel = new("Cancel");
+    private readonly TitleDrag _drag = new();
 
     public Action<string>? OnOk;
     public Action? OnCancel;
@@ -47,29 +51,42 @@ public sealed class InputDialog : Widget
         int lineCount = Math.Max(1, _prompt.Split('\n').Length);
         int contentTop = 26;                                   // below the 16px title
         int contentH = NoField ? lineCount * lineH : lineH + 24; // prompt lines | label + field
-        int buttonsTop = contentTop + contentH + 10;
-        int h = buttonsTop + 22 + 8;
+        int buttonsTop = contentTop + contentH + 18;           // breathing room above the buttons
+        int h = buttonsTop + 22 + 10;
 
         var area = Root()?.Bounds ?? Parent?.Bounds ?? new Rectangle(0, 0, 1024, 768);
         if (area.Width < W || area.Height < h) area = new Rectangle(0, 0, 1024, 768);
-        int x = area.X + (area.Width - W) / 2;
-        int y = area.Y + (area.Height - h) / 2;
+
+        // Centre on first layout; once the user has dragged it, keep where they put it (clamped, so a
+        // window resize cannot strand it off screen).
+        int x, y;
+        if (_drag.Moved)
+        {
+            x = Math.Clamp(Bounds.X, area.X, Math.Max(area.X, area.Right - W));
+            y = Math.Clamp(Bounds.Y, area.Y, Math.Max(area.Y, area.Bottom - h));
+        }
+        else
+        {
+            x = area.X + (area.Width - W) / 2;
+            y = area.Y + (area.Height - h) / 2;
+        }
         Bounds = new Rectangle(x, y, W, h);
 
         _titleRect = new Rectangle(x + 3, y + 3, W - 6, 16);
         _promptY = y + contentTop;
         _fieldRect = new Rectangle(x + 14, y + contentTop + lineH + 2, W - 28, 20); // used only when !NoField
+
+        _ok.Label = OkLabel;
+        _cancel.Label = CancelLabel;
         if (OkOnly)
         {
-            // One button, centred. Cancel keeps a rect so nothing has to null-check it, but it is
-            // parked off the dialog where no click can reach it.
-            _okRect = new Rectangle(x + (W - 72) / 2, y + buttonsTop, 72, 22);
-            _cancelRect = Rectangle.Empty;
+            _ok.Bounds = new Rectangle(x + (W - 72) / 2, y + buttonsTop, 72, 22);
+            _cancel.Bounds = Rectangle.Empty;
         }
         else
         {
-            _okRect = new Rectangle(x + W - 168, y + buttonsTop, 72, 22);
-            _cancelRect = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
+            _ok.Bounds = new Rectangle(x + W - 168, y + buttonsTop, 72, 22);
+            _cancel.Bounds = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
         }
     }
 
@@ -98,11 +115,13 @@ public sealed class InputDialog : Widget
         // Esc still dismisses a one-button box; with nothing to cancel it means the same as OK.
         if (input.Pressed(Keys.Escape)) { if (OkOnly) OnOk?.Invoke(_text); else OnCancel?.Invoke(); return; }
 
-        if (input.LeftPressed)
-        {
-            if (_okRect.Contains(input.Mouse)) { OnOk?.Invoke(_text); return; }
-            if (!OkOnly && _cancelRect.Contains(input.Mouse)) { OnCancel?.Invoke(); return; }
-        }
+        // Move by the title bar, like any Win 3.1 dialog.
+        var bounds = Bounds;
+        if (_drag.Update(input, _titleRect, Root()?.Bounds ?? Bounds, ref bounds)) { Bounds = bounds; Layout(); }
+
+        // Buttons act on release, showing pressed while held.
+        if (_ok.Update(input)) { OnOk?.Invoke(_text); return; }
+        if (!OkOnly && _cancel.Update(input)) { OnCancel?.Invoke(); return; }
     }
 
     private void Blink() { _blinkMs = 0; _caretOn = true; }
@@ -135,16 +154,8 @@ public sealed class InputDialog : Widget
             }
         }
 
-        Button(r, _okRect, OkLabel);
-        if (!OkOnly) Button(r, _cancelRect, CancelLabel);
-    }
-
-    private static void Button(Win31Renderer r, Rectangle rect, string label)
-    {
-        r.DrawPanel(rect, BevelStyle.RaisedThin, Theme.Face);
-        int tw = r.UiFont.MeasureWidth(label);
-        r.DrawText(r.UiFont, label, rect.X + (rect.Width - tw) / 2,
-            rect.Y + (rect.Height - r.UiFont.LineHeight) / 2, Theme.Text);
+        _ok.Draw(r);
+        if (!OkOnly) _cancel.Draw(r);
     }
 
     public override Widget? HitTest(Point p) => Bounds.Contains(p) ? this : null;

@@ -42,7 +42,7 @@ public sealed class WindowFrame : Widget
         // A popup (menu or dialog) is modal for the whole frame: while one is open, only the
         // chrome (title/menu) updates - content is skipped so a menu-item click can't leak
         // through to the content once the menu closes mid-frame.
-        bool popupOpen = Root()?.Popup.IsOpen == true;
+        bool popupOpen = Root()?.Popup.BlocksInput == true;
         foreach (var c in Children.ToArray())
         {
             if (!c.Visible) continue;

@@ -16,7 +16,7 @@ public sealed class ToolButton : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        if (Root()?.Popup.IsOpen == true) { _armed = false; return; }
+        if (Root()?.Popup.BlocksInput == true) { _armed = false; return; }
         if (!Enabled) { _armed = false; return; }
 
         if (input.LeftPressed && Bounds.Contains(input.Mouse)) _armed = true;

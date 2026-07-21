@@ -73,7 +73,7 @@ public sealed class ScrollBar : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        if (Root()?.Popup.IsOpen == true) return;
+        if (Root()?.Popup.BlocksInput == true) return;
         if (!Active) { _pressed = -1; _draggingThumb = false; return; }
 
         double dt = t.ElapsedGameTime.TotalMilliseconds;
