@@ -158,6 +158,15 @@ public sealed class MenuBar : Widget
             int ty = m.TitleRect.Y + (m.TitleRect.Height - font.LineHeight) / 2;
             r.DrawTextMnemonic(font, m.Title, tx, ty, color);
         }
+
+        // 3.1 look: 1px rules top and bottom, framing the white bar against the caption above and
+        // the content below. Drawn here rather than by each frame, so every window that has a menu
+        // bar gets the same bar. The skin decides: a themed one turns them off.
+        if (ThemeManager.Skin.DrawMenuSeparators)
+        {
+            r.HLine(Bounds.Left, Bounds.Top, Bounds.Width, Theme.Text);
+            r.HLine(Bounds.Left, Bounds.Bottom - 1, Bounds.Width, Theme.Text);
+        }
     }
 
     private static Keys LetterKey(char lower)
