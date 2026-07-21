@@ -29,7 +29,12 @@ public abstract class Widget
 
     public virtual void Update(InputState input, GameTime t)
     {
-        foreach (var c in Children)
+        // Snapshot: a child's Update runs input handlers, and handlers legitimately restructure the
+        // tree (a menu item that opens a panel, a close box that removes a window). Enumerating the
+        // live list would throw the moment one did. Taking the children as they were when the pass
+        // began also gives a clean rule: a widget added or removed during a frame takes effect on the
+        // next one. (Costs nothing for a leaf - List.ToArray returns the shared empty array.)
+        foreach (var c in Children.ToArray())
             if (c.Visible) c.Update(input, t);
     }
 
