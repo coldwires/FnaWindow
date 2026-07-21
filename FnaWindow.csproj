@@ -48,9 +48,28 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>%(Filename)%(Extension)</Link>
     </Content>
-    <Content Include="Content\**\*.*">
+    <!-- Fonts change about never, so PreserveNewest is right for them. -->
+    <Content Include="Content/fonts/**/*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Content\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <Link>Content/fonts/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <!--
+      Skin art and cursors get edited while an app is running - the loop is "edit the PNG, dotnet
+      run, look at it". PreserveNewest breaks that loop whenever the edited file ends up OLDER than
+      the copy already in an app output folder (reverting a PNG, checking out an older branch,
+      restoring a backup): the copy is silently skipped and you debug art that is not the art on
+      disk. Always copies regardless of timestamp, and it carries transitively into every consuming
+      app, which is where these files are actually read from.
+      NOTE: %(RecursiveDir) is relative to the glob root, so each of these needs its own Link
+      prefix - one shared Include would flatten skins/win31 to win31 and the app would find no art.
+    -->
+    <Content Include="Content/skins/**/*.*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <Link>Content/skins/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="Content/cursors/**/*.*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <Link>Content/cursors/%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
 
