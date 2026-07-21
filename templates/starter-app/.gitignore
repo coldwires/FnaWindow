@@ -1,0 +1,24 @@
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+
+# Rider / IntelliJ
+.idea/
+*.DotSettings.user
+
+# Editor/IDE local state
+.vscode/
+
+# Secrets
+*.env
+
+# Local runtime files
+*.log
+screenshots/
+
+# OS junk
+Thumbs.db
+.DS_Store

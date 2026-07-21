@@ -2,7 +2,7 @@
 
   <!--
     A build-on for the FnaWindow engine. The engine is expected at engine/ as a git submodule:
-        git submodule add <engine-repo-url> engine
+        git submodule add https://github.com/coldwires/FnaWindow engine
     The single ProjectReference below pulls in the engine library, FNA, the native libs, and
     the bundled fonts. Nothing else to wire up.
   -->
@@ -14,6 +14,16 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <!--
+    engine/ is compiled by FnaWindow.csproj, NOT by this project's default **/*.cs glob. Without
+    this, the engine's own sources (this template included) get compiled into your app and it fails
+    with duplicate Program/Main definitions.
+  -->
+  <ItemGroup>
+    <Compile Remove="engine\**\*.cs" />
+    <None Remove="engine\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="engine\FnaWindow.csproj" />
