@@ -21,6 +21,11 @@ internal static class WindowChrome
     private const string PROP_WIN32_HWND = "SDL.window.win32.hwnd";
 
     [DllImport(SDL)] private static extern uint SDL_GetWindowProperties(IntPtr window);
+    [DllImport(SDL)] private static extern IntPtr SDL_CreateSurfaceFrom(
+        int width, int height, uint format, IntPtr pixels, int pitch);
+    [DllImport(SDL)] [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool SDL_SetWindowIcon(IntPtr window, IntPtr surface);
+    [DllImport(SDL)] private static extern void SDL_DestroySurface(IntPtr surface);
     [DllImport(SDL)] private static extern IntPtr SDL_GetPointerProperty(
         uint props, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, IntPtr defaultValue);
     [DllImport(SDL)] [return: MarshalAs(UnmanagedType.I1)]
@@ -161,5 +166,32 @@ internal static class WindowChrome
             if (ht != HTCLIENT) return new IntPtr(ht);
         }
         return CallWindowProcW(_origProc, hWnd, msg, wParam, lParam);
+    }
+
+    // SDL_PIXELFORMAT_ABGR8888, which is byte order R,G,B,A in memory on a little-endian machine -
+    // exactly how FNA lays out Color. Derived from SDL_DEFINE_PIXELFORMAT(PACKED32, ABGR, 8888, 32, 4):
+    // (1<<28) | (6<<24) | (7<<20) | (6<<16) | (32<<8) | 4.
+    private const uint PIXELFORMAT_ABGR8888 = 0x16762004;
+
+    /// <summary>
+    /// Sets the window's icon - what the taskbar and Alt+Tab show. This is separate from the exe
+    /// icon the shell displays, which comes from the build (ApplicationIcon); an app usually wants
+    /// both, from the same artwork.
+    /// </summary>
+    public static bool SetWindowIcon(IntPtr window, Color[] pixels, int width, int height)
+    {
+        if (window == IntPtr.Zero || pixels.Length < width * height) return false;
+        var pin = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+        try
+        {
+            IntPtr surface = SDL_CreateSurfaceFrom(
+                width, height, PIXELFORMAT_ABGR8888, pin.AddrOfPinnedObject(), width * 4);
+            if (surface == IntPtr.Zero) return false;
+            bool ok = SDL_SetWindowIcon(window, surface);
+            SDL_DestroySurface(surface);   // SDL keeps its own copy of the icon
+            return ok;
+        }
+        catch { return false; }
+        finally { pin.Free(); }
     }
 }

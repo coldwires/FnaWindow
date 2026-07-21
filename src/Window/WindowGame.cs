@@ -129,6 +129,31 @@ public class WindowGame : Game
     /// </summary>
     protected virtual MouseCursor? BuildCursor() => null;
 
+    /// <summary>
+    /// The PNG used as the window icon - what the taskbar and Alt+Tab show. Relative to the app's
+    /// output folder; null skips it. The default convention is <c>Content/appicon.png</c>, so an app
+    /// gets an icon by dropping the file in, with no code. This is NOT the exe icon the shell shows
+    /// in Explorer - that one is baked at build time by the csproj's ApplicationIcon. Point both at
+    /// the same artwork.
+    /// </summary>
+    protected virtual string? WindowIconPath => Path.Combine("Content", "appicon.png");
+
+    private void ApplyWindowIcon()
+    {
+        if (WindowIconPath is not { Length: > 0 } rel) return;
+        string path = Path.Combine(AppContext.BaseDirectory, rel);
+        if (!File.Exists(path)) return;   // no icon shipped is a fine answer
+        try
+        {
+            using var fs = File.OpenRead(path);
+            var tex = Texture2D.FromStream(GraphicsDevice, fs);
+            var px = new Color[tex.Width * tex.Height];
+            tex.GetData(px);
+            WindowChrome.SetWindowIcon(Window.Handle, px, tex.Width, tex.Height);
+        }
+        catch { /* a bad PNG just leaves the default icon */ }
+    }
+
     /// <summary>Give the frame's caption and menu bar the chrome font. Called after BuildFrame, so
     /// an app that builds its own captions can also read <see cref="ChromeFont"/> directly.</summary>
     private void ApplyChromeFont()
@@ -213,6 +238,7 @@ public class WindowGame : Game
         // Optional software pointer. Default is null (native OS cursor); an app opts in by
         // overriding BuildCursor. The Cursor setter hides the OS cursor when non-null.
         Cursor = BuildCursor();
+        ApplyWindowIcon();
 
         Root = new RootDesktop();
         (Frame, Caption) = BuildFrame(UiFont);
