@@ -26,6 +26,11 @@ public class WindowGame : Game
     protected TitleBar Caption = null!;      // its title bar: drives close/min/max + the drag hit-test
     protected BitmapFont UiFont = null!, UiBoldFont = null!, EditorFont = null!;
 
+    /// <summary>The bold face used for window chrome (title bar, menu bar, and an app's own child
+    /// captions), or null if the atlas is missing - callers then fall back to <see cref="UiBoldFont"/>.
+    /// Applied to the frame automatically; an app with its own captions can read it.</summary>
+    protected BitmapFont? ChromeFont;
+
     private MouseCursor? _cursor;
     /// <summary>Software mouse pointer, or null (default) to use the native OS cursor. Assigning a
     /// non-null cursor hides the OS cursor and draws this sprite at the mouse each frame; set it
@@ -124,6 +129,45 @@ public class WindowGame : Game
     /// </summary>
     protected virtual MouseCursor? BuildCursor() => null;
 
+    /// <summary>Give the frame's caption and menu bar the chrome font. Called after BuildFrame, so
+    /// an app that builds its own captions can also read <see cref="ChromeFont"/> directly.</summary>
+    private void ApplyChromeFont()
+    {
+        if (ChromeFont == null) return;
+        Caption.Font = ChromeFont;
+        if (Frame is WindowFrame wf && wf.Menu != null) wf.Menu.BarFont = ChromeFont;
+    }
+
+    // The Win 3.1 pointer set: each PNG under Content/cursors carries the hotspot from its original
+    // .cur. Widgets ask for one by key (a text area -> "ibeam", a window edge -> "size*"); absent
+    // art simply leaves the OS cursor in place, since CursorDefault stays null.
+    private void LoadWin31Cursors()
+    {
+        (string key, int hx, int hy)[] set =
+        {
+            ("arrow", 0, 0), ("ibeam", 15, 16), ("cross", 15, 16), ("wait", 16, 16),
+            ("sizewe", 17, 8), ("sizens", 14, 10), ("sizenwse", 7, 6), ("sizenesw", 24, 6),
+        };
+        string dir = Path.Combine(AppContext.BaseDirectory, "Content", "cursors");
+        bool any = false;
+        foreach (var (key, hx, hy) in set)
+        {
+            string path = Path.Combine(dir, key + ".png");
+            if (!File.Exists(path)) continue;
+            try
+            {
+                using var fs = File.OpenRead(path);
+                var tex = Texture2D.FromStream(GraphicsDevice, fs);
+                var px = new Color[tex.Width * tex.Height];
+                tex.GetData(px);
+                Cursors.Define(key, px, tex.Width, tex.Height, hx, hy);
+                any = true;
+            }
+            catch { /* skip a bad cursor; the OS one still applies */ }
+        }
+        if (any) CursorDefault = "arrow";
+    }
+
     /// <summary>The default cursor key (see <see cref="Cursors"/>), used wherever no widget asks for a
     /// specific one. Null (default) means the app registered no cursors, so the OS cursor is left alone.</summary>
     protected string? CursorDefault;
@@ -152,7 +196,19 @@ public class WindowGame : Game
         EditorFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "fixedsys_12"));
         UiFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_11"));
         UiBoldFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_11_bold"));
+        // Window chrome (title bar, menu bar, child captions) uses a larger bold face: in 3.1 the
+        // caption and the menus are the bold System font, not the same size as body text.
+        try { ChromeFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_13_bold")); }
+        catch { ChromeFont = null; }
         Renderer = new Win31Renderer(GraphicsDevice, Batch, UiFont, UiBoldFont, EditorFont);
+
+        // The default look: authored Win 3.1 art for the chrome, and the 3.1 cursor set. Both fall
+        // back cleanly - a missing PNG drops to the exact procedural drawing, and missing cursor art
+        // leaves the OS pointer alone. An app that wants the procedural look calls
+        // ThemeManager.ApplySkin(new Win31Skin()) after base.LoadContent().
+        Win31Png.LoadAssets(GraphicsDevice);
+        Win31Png.Apply();
+        LoadWin31Cursors();
 
         // Optional software pointer. Default is null (native OS cursor); an app opts in by
         // overriding BuildCursor. The Cursor setter hides the OS cursor when non-null.
@@ -160,6 +216,7 @@ public class WindowGame : Game
 
         Root = new RootDesktop();
         (Frame, Caption) = BuildFrame(UiFont);
+        ApplyChromeFont();
         Caption.OnClose = Exit;
         Caption.OnMinimize = () => { if (_borderless) WindowChrome.Minimize(_sdlWindow); };
         Caption.OnMaximize = ToggleMaximize;
