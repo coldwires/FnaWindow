@@ -9,6 +9,9 @@ namespace FnaWindow;
 /// field, OK / Cancel). Lives in the <see cref="PopupLayer"/> and is driven by its owner
 /// (like a menu). Enter/OK commits the text; Esc/Cancel aborts. Reusable for Rename Session,
 /// Resume by ID, etc.
+/// <para>Two flags trim it down: <see cref="NoField"/> drops the text field, for a confirm or a
+/// message; <see cref="OkOnly"/> drops the Cancel button and centres OK, for an About box or a
+/// notice where there is nothing to cancel. Set both for a plain message box.</para>
 /// </summary>
 public sealed class InputDialog : Widget
 {
@@ -26,6 +29,7 @@ public sealed class InputDialog : Widget
     public Action<string>? OnOk;
     public Action? OnCancel;
     public bool NoField;                                  // confirm-only (no text field)
+    public bool OkOnly;                                   // single button, centred (About, notices)
     public string OkLabel = "OK", CancelLabel = "Cancel";
 
     public InputDialog(string title, string prompt, string initial)
@@ -55,8 +59,18 @@ public sealed class InputDialog : Widget
         _titleRect = new Rectangle(x + 3, y + 3, W - 6, 16);
         _promptY = y + contentTop;
         _fieldRect = new Rectangle(x + 14, y + contentTop + lineH + 2, W - 28, 20); // used only when !NoField
-        _okRect = new Rectangle(x + W - 168, y + buttonsTop, 72, 22);
-        _cancelRect = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
+        if (OkOnly)
+        {
+            // One button, centred. Cancel keeps a rect so nothing has to null-check it, but it is
+            // parked off the dialog where no click can reach it.
+            _okRect = new Rectangle(x + (W - 72) / 2, y + buttonsTop, 72, 22);
+            _cancelRect = Rectangle.Empty;
+        }
+        else
+        {
+            _okRect = new Rectangle(x + W - 168, y + buttonsTop, 72, 22);
+            _cancelRect = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
+        }
     }
 
     public override void Update(InputState input, GameTime t)
@@ -81,12 +95,13 @@ public sealed class InputDialog : Widget
         }
 
         if (input.Pressed(Keys.Enter)) { OnOk?.Invoke(_text); return; }
-        if (input.Pressed(Keys.Escape)) { OnCancel?.Invoke(); return; }
+        // Esc still dismisses a one-button box; with nothing to cancel it means the same as OK.
+        if (input.Pressed(Keys.Escape)) { if (OkOnly) OnOk?.Invoke(_text); else OnCancel?.Invoke(); return; }
 
         if (input.LeftPressed)
         {
             if (_okRect.Contains(input.Mouse)) { OnOk?.Invoke(_text); return; }
-            if (_cancelRect.Contains(input.Mouse)) { OnCancel?.Invoke(); return; }
+            if (!OkOnly && _cancelRect.Contains(input.Mouse)) { OnCancel?.Invoke(); return; }
         }
     }
 
@@ -121,7 +136,7 @@ public sealed class InputDialog : Widget
         }
 
         Button(r, _okRect, OkLabel);
-        Button(r, _cancelRect, CancelLabel);
+        if (!OkOnly) Button(r, _cancelRect, CancelLabel);
     }
 
     private static void Button(Win31Renderer r, Rectangle rect, string label)
