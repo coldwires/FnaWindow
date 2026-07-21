@@ -2,7 +2,7 @@
 
 Build desktop apps with fully custom chrome on FNA. The OS title bar and border are removed, but the window still drags, resizes from any edge, maximizes, and snaps like a normal one.
 
-It comes with a Windows 3.1 style theme (title bar, menus, bevels) as the default look. That look is just a palette plus a renderer, so you can draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a text editor, a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
+It comes with a complete Windows 3.1 look as the default: authored 9-slice chrome art, the 3.1 cursor set, and the bold chrome font, all applied for you. That look is just a palette plus a renderer, so you can draw the window however you like. What sits underneath is an ordinary resizable OS window with no system frame, which is enough to build a text editor, a file explorer, a chat client, dev tooling, or a small utility on top of. You write one subclass to get a working app.
 
 ![demo](docs/demo.png)
 
@@ -112,6 +112,7 @@ The base class handles the borderless window, native drag and resize, the render
 | `TextArea` / `TextBuffer` | Multi-line text editing: caret, selection, undo/redo, clipboard, word wrap, key and mouse model, with seams for a richer editor to subclass. |
 | `Clipboard` / `Tabs` | System clipboard text with an in-process fallback; tab-to-space expansion at tab stops. |
 | `Theme` / `ThemeManager` / `Palette` | Mutable palette plus runtime theme switching. |
+| `Win31PngSkin` / `Win31Skin` | The default look: authored 9-slice art, tinted by the palette so themes still work. Any missing PNG falls back to the procedural drawing. |
 | `MainThread` | Post background-thread results back to the render thread. |
 
 ## Docs
