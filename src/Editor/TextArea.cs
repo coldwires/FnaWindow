@@ -233,6 +233,14 @@ public class TextArea : Widget
     /// <summary>Total visual rows in the buffer - the vertical scroll extent.</summary>
     protected int RowCount => _rows.Count;
 
+    /// <summary>The visual row at <paramref name="index"/>: which logical line it belongs to and the
+    /// column span [Start, End) of that line it shows. Unwrapped that is always the whole line.</summary>
+    protected (int Line, int Start, int End) RowAt(int index)
+    {
+        var row = _rows[Math.Clamp(index, 0, _rows.Count - 1)];
+        return (row.Line, row.Start, row.End);
+    }
+
     // -- Layout ------------------------------------------------------------
 
     /// <summary>I-beam over the text region (not the scrollbars), else defer to parent/default.</summary>
