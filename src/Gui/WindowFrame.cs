@@ -11,8 +11,10 @@ namespace FnaWindow;
 /// </summary>
 public sealed class WindowFrame : Widget
 {
-    /// <summary>Outer raised-frame thickness (classic Win 3.1 look).</summary>
-    public const int FrameB = 2;
+    /// <summary>Outer window-frame thickness. The 3.1 frame is 4px - black, face, face, black - and
+    /// the skin draws it over this band, so everything inside has to start 4px in or the caption
+    /// buttons sit under the frame instead of beside it.</summary>
+    public const int FrameB = 4;
 
     public TitleBar Title { get; } = new();
     public MenuBar? Menu { get; private set; }
@@ -67,6 +69,9 @@ public sealed class WindowFrame : Widget
 
         if (Menu != null)
         {
+            // The menu tucks up one pixel so its top rule lands ON the caption's last row. Without
+            // that overlap you get two 1px lines stacked under the title instead of one.
+            y -= 1;
             Menu.Bounds = new Rectangle(x, y, w, Theme.MenuBarHeight);
             y += Theme.MenuBarHeight;
         }
