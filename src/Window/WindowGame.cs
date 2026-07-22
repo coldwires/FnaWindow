@@ -146,7 +146,9 @@ public class WindowGame : Game
         try
         {
             using var fs = File.OpenRead(path);
-            var tex = Texture2D.FromStream(GraphicsDevice, fs);
+            // The texture is a PNG decoder and nothing more - the pixels are copied straight out and
+            // handed to SDL, so it must be disposed rather than left for the finalizer.
+            using var tex = Texture2D.FromStream(GraphicsDevice, fs);
             var px = new Color[tex.Width * tex.Height];
             tex.GetData(px);
             WindowChrome.SetWindowIcon(Window.Handle, px, tex.Width, tex.Height);
@@ -182,7 +184,9 @@ public class WindowGame : Game
             try
             {
                 using var fs = File.OpenRead(path);
-                var tex = Texture2D.FromStream(GraphicsDevice, fs);
+                // Same as the window icon: decode, copy the pixels to SDL, drop the texture. Without
+                // the using, all eight cursors leak a Texture2D and FNA reports each one at exit.
+                using var tex = Texture2D.FromStream(GraphicsDevice, fs);
                 var px = new Color[tex.Width * tex.Height];
                 tex.GetData(px);
                 Cursors.Define(key, px, tex.Width, tex.Height, hx, hy);
