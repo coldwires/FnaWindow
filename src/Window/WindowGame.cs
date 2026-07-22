@@ -101,7 +101,7 @@ public class WindowGame : Game
         IsFixedTimeStep = true;                    // ~60fps update; no runaway CPU
         Window.AllowUserResizing = true;
         Window.Title = title;
-        Window.ClientSizeChanged += (_, _) => SyncBackBuffer();
+        Window.ClientSizeChanged += (_, _) => { _resizeSettle = ResizeSettleFrames; Relayout(); RequestRedraw(); };
         IsMouseVisible = true;
         Content.RootDirectory = "Content";
     }
@@ -292,17 +292,40 @@ public class WindowGame : Game
     /// covered the app's own maximize button and nothing else; hanging it off ClientSizeChanged
     /// covers every way a window can change size, including the ones Windows performs for us.
     /// </summary>
+    // Frames of quiet required after the last size change before the surface is resynced. A drag
+    // raises ClientSizeChanged every frame, so the counter keeps resetting and this only fires once
+    // the user lets go.
+    private const int ResizeSettleFrames = 8;
+    private int _resizeSettle;
+
+    /// <summary>
+    /// Re-points the render surface at the current client size, ONCE a resize has finished.
+    ///
+    /// Never call this mid-resize. <c>ApplyChanges</c> does not only resize the backbuffer, it also
+    /// resizes the WINDOW to match - so running it while the user is dragging an edge fights the
+    /// drag and the window will not resize properly. That is why it is debounced rather than
+    /// checked every frame.
+    ///
+    /// It is needed at all because nothing else updates the preferred backbuffer after startup:
+    /// without it, a resized window keeps rendering at the old size and FNA scales the result, which
+    /// turns every 1-bit glyph and single-pixel bevel soft.
+    /// </summary>
     private void SyncBackBuffer()
     {
-        if (_syncingBackBuffer) return;   // ApplyChanges can raise ClientSizeChanged again
+        if (_syncingBackBuffer) return;   // ApplyChanges raises ClientSizeChanged again
 
         int w = Window.ClientBounds.Width, h = Window.ClientBounds.Height;
         if (w <= 0 || h <= 0) return;     // minimized: nothing to size to
 
-        // Compare against the ACTUAL render surface, not the preferred size. ClientSizeChanged does
-        // not always carry the final size - on a maximize it reports before Windows has settled, so
-        // trusting it leaves the surface stale and the window blurry. The viewport is ground truth,
-        // and Update calls this every frame, so whatever the event misses is caught next frame.
+        // Repaint unconditionally. FNA sometimes resizes the backbuffer itself (it does on a grow),
+        // and then the check below finds nothing to do - but the last frame DRAWN is still the
+        // pre-resize one, and the idle throttle is happy to leave it there, stretched. The redraw
+        // is the point as much as the resize is.
+        Relayout();
+        RequestRedraw();
+
+        // Compare against the ACTUAL render surface, not the preferred size, which can already
+        // claim a size the device never took.
         var vp = GraphicsDevice.Viewport;
         if (vp.Width == w && vp.Height == h) return;
 
@@ -338,7 +361,8 @@ public class WindowGame : Game
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
-        SyncBackBuffer();                         // the surface must match the client, every frame
+        // Resync the surface once the resize has SETTLED, never during it - see SyncBackBuffer.
+        if (_resizeSettle > 0 && --_resizeSettle == 0) SyncBackBuffer();
         SyncMaximized();                          // snap/Win+Up change it behind our back
 
         double dt = gameTime.ElapsedGameTime.TotalMilliseconds;
