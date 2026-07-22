@@ -68,13 +68,13 @@ is better once you ship more than one app on the engine.
 
 ```
 WindowGame (FNA Game)
- ├─ RootDesktop            ← root of the widget tree; owns the PopupLayer + focus
- │   └─ WindowFrame        ← the window chrome
- │       ├─ TitleBar       ← draggable caption + min/max/close
- │       ├─ MenuBar        ← (optional) top menus → dropdown popups
- │       ├─ <your Content> ← any Widget, fills the middle
- │       └─ StatusBar      ← (optional)
- └─ WindowChrome           ← Win32/SDL interop (borderless + WM_NCHITTEST)
+ +- RootDesktop            <- root of the widget tree; owns the PopupLayer + focus
+ |   +- WindowFrame        <- the window chrome
+ |       +- TitleBar       <- draggable caption + min/max/close
+ |       +- MenuBar        <- (optional) top menus -> dropdown popups
+ |       +- <your Content> <- any Widget, fills the middle
+ |       +- StatusBar      <- (optional)
+ +- WindowChrome           <- Win32/SDL interop (borderless + WM_NCHITTEST)
 ```
 
 The loop is simple and close to immediate mode: every frame `WindowGame` calls `Root.Update(input, time)` then `Root.Draw(renderer)`. There are no dirty rects; the whole tree redraws each frame, which is cheap at this scale and capped to 60 fps.
@@ -146,7 +146,7 @@ Add it with `frame.SetContent(new Counter())`, or nest it: `Add(child)` in a con
 `Win31Renderer` provides the drawing primitives the whole look is built from:
 
 ```csharp
-r.Fill(rect, color);                       // solid fill (1×1 white pixel, tinted)
+r.Fill(rect, color);                       // solid fill (1x1 white pixel, tinted)
 r.FrameRect(rect, color);                  // 1px outline
 r.HLine(x, y, len, color); r.VLine(...);
 r.DrawBevel(rect, style);                  // border only
