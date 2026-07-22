@@ -122,9 +122,10 @@ The base class handles the borderless window, native drag and resize, the render
 | `WindowChrome` | Win32/SDL interop: strip the frame, answer hit-tests, move/resize helpers. |
 | `Win31Renderer` | Fills, bevels (`Raised/SunkenThin/Thick`), panels, text, dither, mnemonics. |
 | `Widget` / `RootDesktop` / `PopupLayer` | Retained-mode tree, focus, top-most popups. |
-| `TitleBar` `MenuBar` `Toolbar` `ScrollBar` `StatusBar` | The stock widgets. |
+| `TitleBar` `MenuBar` `Toolbar` `ScrollBar` `StatusBar` `ListBox` | The stock widgets. `ListBox` is a scrollable, selectable row list; override `DrawRow` for columns. |
+| `DirectoryListing` / `DirectoryLoader` | Read a directory into rows (parent link, folders, filtered files, drives) with sizes and timestamps; the loader does it off the render thread and drops results the user has already navigated away from. |
 | `InputDialog` / `RetroFileDialog` | Modal prompt, confirm and message boxes; a Win 3.1 Open / Save As dialog that browses directories off the render thread. |
-| `TextArea` / `TextBuffer` | Multi-line text editing: caret, selection, undo/redo, clipboard, word wrap, key and mouse model, with seams for a richer editor to subclass. |
+| `TextArea` / `TextBuffer` | Multi-line text editing: caret, selection, undo/redo, clipboard, word wrap, key and mouse model, with seams for a richer editor to subclass. `ReadOnly` gives a pane the program writes and the user can only read and copy. |
 | `Clipboard` / `Tabs` | System clipboard text with an in-process fallback; tab-to-space expansion at tab stops. |
 | `Theme` / `ThemeManager` / `Palette` | Mutable palette plus runtime theme switching. |
 | `Win31PngSkin` / `Win31Skin` | The default look: authored 9-slice art, tinted by the palette so themes still work. Any missing PNG falls back to the procedural drawing. |

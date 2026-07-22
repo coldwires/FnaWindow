@@ -240,6 +240,62 @@ dlg.OnCancel = frame.CloseDialog;
 frame.ShowDialog(dlg);
 ```
 
+It is assembled from two pieces you can use directly, which is worth knowing if you are building anything that browses files rather than just picking one.
+
+---
+
+## Lists
+
+`ListBox` is the Win 3.1 list: a sunken well of fixed-height rows, one selection, and a real `ScrollBar` when the rows do not fit.
+
+```csharp
+var list = new ListBox();
+list.SetItems(new[] { "alpha", "beta", "gamma" });
+list.SelectionChanged = i => status.Message = "Row " + i;
+list.Activated = i => Open(i);          // double-click, or Enter
+frame.SetContent(list);
+```
+
+Set `HandleKeys = false` when something else in the window needs the arrow keys (a command prompt, say) and drive it with `MoveSelection` and `Select` instead.
+
+For rows that are not plain strings, override two members and keep your own row data:
+
+```csharp
+sealed class FileList : ListBox
+{
+    public readonly List<FsEntry> Rows = new();
+    protected override int RowCount => Rows.Count;
+
+    protected override void DrawRow(Win31Renderer r, int i, Rectangle rect, bool selected)
+    {
+        var fg = selected ? Theme.TitleText : Theme.Text;   // the band is already painted
+        r.DrawText(r.UiFont, Rows[i].Display, rect.X + 4, rect.Y + 2, fg);
+        r.DrawText(r.UiFont, Rows[i].Size.ToString(), rect.Right - 80, rect.Y + 2, fg);
+    }
+}
+```
+
+Scrolling, selection, keys, the wheel and double-click are the same either way.
+
+---
+
+## Reading directories
+
+`DirectoryListing.Read` returns a directory as `FsEntry` rows - a parent link, subdirectories, files matching a pattern, and the drive roots - with the name, display form (`[..]`, `[subdir]`, `[-c-]`), full path, size and timestamp. Every filesystem call inside is wrapped, because enumerating a directory fails for ordinary reasons and a browser has to show what it can.
+
+It does real I/O, so UI code should not call it directly. Use `DirectoryLoader`, which runs it off the game thread and applies the result back on it:
+
+```csharp
+private readonly DirectoryLoader _loader = new();
+
+void Navigate(string dir)
+{
+    _loader.Begin(dir, entries => { _rows = entries; list.Layout(); }, pattern: "*.*");
+}
+```
+
+The generation stamping is the reason to use it rather than a bare `Task.Run`: hold Down through a directory tree and you start a read per folder, and they finish out of order. A result that has been superseded is dropped instead of overwriting the folder you are now looking at. Use one loader per list. `DirectoryListing.Sort` re-orders by name, size or date while keeping the parent link first and directories above files.
+
 ---
 
 ## Text areas
@@ -254,6 +310,18 @@ frame.SetContent(text);
 ```
 
 `TextBuffer` is the model and is usable on its own: line-based, edits are range replacements, every edit bumps `Version` and raises `Changed` with the range that changed, and undo/redo coalesces typing into word-sized groups. `Tabs.Expand` turns hard tabs into spaces at tab stops, which is worth doing on load and on paste since the grid is one cell per character.
+
+### Read-only
+
+`ReadOnly` stops the **user** editing: typing, Enter, Tab, Backspace, Delete, Cut, Paste, Undo and Redo all do nothing, and no caret is drawn. Moving, selecting, scrolling, Select All and Copy still work, so the text stays readable and copyable rather than inert.
+
+The **program** can still edit, deliberately - you write through `Buf` as usual. That is what makes it useful for an output pane, where a log is appended to while the reader may only look and copy:
+
+```csharp
+var output = new TextArea(buffer) { ReadOnly = true, HighlightCurrentLine = false };
+```
+
+Turn the current-line band off with it, as above: it tracks a caret the reader cannot see or move.
 
 ### Subclassing it
 

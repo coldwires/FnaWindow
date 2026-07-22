@@ -53,6 +53,19 @@ public class TextArea : Widget
     public bool HighlightCurrentLine = true;
 
     /// <summary>
+    /// The USER cannot edit: typing, Enter, Tab, Backspace, Delete, Cut, Paste, Undo and Redo all do
+    /// nothing, and no caret is drawn. Everything that does not change the text still works -
+    /// moving, selecting, scrolling, Select All and Copy - so the text stays readable and
+    /// copyable rather than inert.
+    ///
+    /// The PROGRAM can still edit, deliberately: the owner writes through <see cref="Buf"/> as
+    /// usual. That is what makes this useful for an output pane, where a log is appended to while
+    /// the user may only read and copy it. Set <see cref="HighlightCurrentLine"/> false too for that
+    /// case - a current-line band tracks a caret the reader cannot see or move.
+    /// </summary>
+    public bool ReadOnly;
+
+    /// <summary>
     /// Wrap long lines to the width of the text region instead of scrolling sideways. The buffer is
     /// untouched - no line breaks are inserted - so this is purely how the text is laid out: a
     /// logical line becomes one or more visual rows, broken after a space where there is one and
@@ -288,7 +301,7 @@ public class TextArea : Widget
         _blink += t.ElapsedGameTime.TotalMilliseconds;
         if (_blink >= Theme.CaretBlinkMs) { _blink -= Theme.CaretBlinkMs; _blinkOn = !_blinkOn; }
 
-        if (Root()?.Popup.BlocksInput == true) return;
+        if (InputBlocked) return;
         if (!MouseBlocked) HandleMouse(input);
     }
 
@@ -361,6 +374,7 @@ public class TextArea : Widget
 
     public override void OnChar(char c)
     {
+        if (ReadOnly) return;
         if (char.IsControl(c)) return; // Tab/Enter/Backspace arrive as keys
         InsertText(c.ToString(), coalesce: true);
     }
@@ -389,6 +403,11 @@ public class TextArea : Widget
         if (input.Pressed(Keys.End))  { Move(ctrl ? Buf.End() : RowEnd(), shift); return; }
         if (input.Pressed(Keys.PageUp))   { MoveV(-VisLines, shift); return; }
         if (input.Pressed(Keys.PageDown)) { MoveV(+VisLines, shift); return; }
+
+        // Everything past here changes the text. Gating at the call site rather than inside each
+        // one means a subclass's EnterKey/Backspace/DeleteKey override is never entered in
+        // read-only mode, so it cannot forget to check.
+        if (ReadOnly) return;
 
         if (input.Pressed(Keys.Enter)) { EnterKey(); return; }
         if (input.Pressed(Keys.Tab))
@@ -489,20 +508,23 @@ public class TextArea : Widget
         if (next.CompareTo(_caret) != 0) { Buf.Delete(_caret, next); Collapse(_caret); EnsureVisible(); }
     }
 
-    // Public ops, for keyboard shortcuts and an Edit menu alike.
+    // Public ops, for keyboard shortcuts and an Edit menu alike. The four that change the text check
+    // ReadOnly here rather than at the key handler, so an app's Edit menu is gated by the same
+    // check as Ctrl+X and cannot drift from it.
     public void Copy() { if (HasSel) Clipboard.Text = SelectedText; }
-    public void Cut() { if (HasSel) { Clipboard.Text = SelectedText; DeleteSelection(); EnsureVisible(); } }
+    public void Cut() { if (ReadOnly || !HasSel) return; Clipboard.Text = SelectedText; DeleteSelection(); EnsureVisible(); }
 
     public void Paste()
     {
+        if (ReadOnly) return;
         string text = Clipboard.Text;
         if (string.IsNullOrEmpty(text)) return;
         int startCol = HasSel ? Sel().a.Col : _caret.Col; // where the paste lands once the selection is gone
         InsertText(Tabs.Expand(text, startCol), coalesce: false);
     }
 
-    public void Undo() { var p = Buf.Undo(); if (p is { } pp) { Collapse(pp); EnsureVisible(); } }
-    public void Redo() { var p = Buf.Redo(); if (p is { } pp) { Collapse(pp); EnsureVisible(); } }
+    public void Undo() { if (ReadOnly) return; var p = Buf.Undo(); if (p is { } pp) { Collapse(pp); EnsureVisible(); } }
+    public void Redo() { if (ReadOnly) return; var p = Buf.Redo(); if (p is { } pp) { Collapse(pp); EnsureVisible(); } }
     public void SelectAll() { _anchor = new Position(0, 0); _caret = Buf.End(); ResetBlink(); NotifyCaret(); }
     public bool CanUndo => Buf.CanUndo;
     public bool CanRedo => Buf.CanRedo;
@@ -791,8 +813,9 @@ public class TextArea : Widget
 
             DrawLineOverlay(r, row.Line, line, y, firstCol, lastCol);
 
-            // Caret - the traditional thick underline, 2px tall spanning the cell.
-            if (Focused && _blinkOn && ri == caretRow)
+            // Caret - the traditional thick underline, 2px tall spanning the cell. A read-only area
+            // draws none: it would blink at an insertion point that cannot be typed at.
+            if (Focused && _blinkOn && ri == caretRow && !ReadOnly)
             {
                 int cx = OriginX + (_caret.Col - row.Start - ScrollCol) * CellW;
                 if (_caret.Col >= firstCol && _caret.Col <= firstCol + VisCols)

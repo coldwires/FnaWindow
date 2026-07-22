@@ -32,6 +32,7 @@ public sealed class DemoGame : WindowGame
 
         var file = new List<MenuItemDef>
         {
+            MenuItemDef.Item("&Open...", null, () => ShowOpen(frame)),
             MenuItemDef.Item("&Save Screenshot", null, () =>
             {
                 var path = CaptureScreenshot();
@@ -75,6 +76,18 @@ public sealed class DemoGame : WindowGame
     {
         foreach (var it in _menu.Menus[1].Items) // Themes
             if (!it.IsSeparator) it.Checked = it.Label == ThemeManager.Current;
+    }
+
+    // Exercises RetroFileDialog, which is the engine's own dialog and was previously not reachable
+    // from the Demo at all - so nothing here ever proved it worked.
+    private void ShowOpen(WindowFrame frame)
+    {
+        var dlg = new RetroFileDialog(save: false, "*.*", System.AppContext.BaseDirectory, null)
+        {
+            OnOk = path => { _status.Message = "Chose " + Path.GetFileName(path); frame.CloseDialog(); },
+            OnCancel = frame.CloseDialog,
+        };
+        frame.ShowDialog(dlg);
     }
 
     private void ShowAbout(WindowFrame frame)

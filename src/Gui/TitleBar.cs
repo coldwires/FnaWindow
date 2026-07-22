@@ -31,7 +31,7 @@ public sealed class TitleBar : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        if (Root()?.Popup.BlocksInput == true) return;
+        if (InputBlocked) return;
 
         if (input.LeftPressed)
             _pressed = WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect);

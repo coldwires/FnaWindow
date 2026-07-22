@@ -16,7 +16,7 @@ public sealed class ToolButton : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        if (Root()?.Popup.BlocksInput == true) { _armed = false; return; }
+        if (InputBlocked) { _armed = false; return; }
         if (!Enabled) { _armed = false; return; }
 
         if (input.LeftPressed && Bounds.Contains(input.Mouse)) _armed = true;
@@ -56,7 +56,7 @@ public sealed class ToolButton : Widget
 
 /// <summary>
 /// The toolbar row: New / Open / Save icon buttons, a gap, then
-/// text buttons for "dotnet build" and "▶ Run".
+/// text buttons for "dotnet build" and "â–¶ Run".
 /// </summary>
 public sealed class Toolbar : Widget
 {
@@ -137,12 +137,12 @@ internal static class Icons
 
     public static void RunLabel(Win31Renderer r, Rectangle b)
     {
-        // Green play triangle + "Run" text (▶ isn't in the ASCII atlas).
+        // Green play triangle + "Run" text (â–¶ isn't in the ASCII atlas).
         int th = 9;
         int tx = b.X + 8, ty = b.Y + (b.Height - th) / 2;
         for (int i = 0; i < 5; i++)
         {
-            int col = i < 3 ? i : 4 - i; // 0,1,2,1,0 → triangle height at each x
+            int col = i < 3 ? i : 4 - i; // 0,1,2,1,0 â†’ triangle height at each x
             r.Fill(tx + i, ty + (th / 2) - col, 1, 2 * col + 1, Theme.SyntaxKeyword);
         }
         string s = "Run";

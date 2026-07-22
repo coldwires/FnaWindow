@@ -66,6 +66,35 @@ public abstract class Widget
     public virtual void OnKey(InputState input) { }
     public virtual void OnChar(char c) { }
 
+    /// <summary>
+    /// True when an open popup owns the input AND this widget is not part of that popup, which is
+    /// the condition every interactive widget wants before it looks at the mouse.
+    ///
+    /// The "not part of it" half matters: a plain <c>Popup.BlocksInput</c> check is also true for
+    /// the popup's own contents, so a shared widget used inside a modal would go dead exactly when
+    /// the modal is up. That is why <see cref="RetroFileDialog"/> used to hand-draw its own
+    /// scrollbar instead of using <see cref="ScrollBar"/>. Walking up to the popup fixes it for
+    /// every widget at once.
+    ///
+    /// During the frame a popup closes in, <c>Current</c> is already null while
+    /// <c>BlocksInput</c> is still true, so this reports blocked for everything - which is the
+    /// intent: the click that chose a menu item must not also land on what was underneath.
+    /// </summary>
+    protected bool InputBlocked
+    {
+        get
+        {
+            var root = Root();
+            if (root == null || !root.Popup.BlocksInput) return false;
+
+            var popup = root.Popup.Current;
+            if (popup == null) return true;
+            for (Widget? w = this; w != null; w = w.Parent)
+                if (ReferenceEquals(w, popup)) return false;
+            return true;
+        }
+    }
+
     /// <summary>Walks up to the containing <see cref="RootDesktop"/>, if any.</summary>
     public RootDesktop? Root()
     {
