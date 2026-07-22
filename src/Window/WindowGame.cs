@@ -101,7 +101,7 @@ public class WindowGame : Game
         IsFixedTimeStep = true;                    // ~60fps update; no runaway CPU
         Window.AllowUserResizing = true;
         Window.Title = title;
-        Window.ClientSizeChanged += (_, _) => Relayout();
+        Window.ClientSizeChanged += (_, _) => SyncBackBuffer();
         IsMouseVisible = true;
         Content.RootDirectory = "Content";
     }
@@ -278,6 +278,50 @@ public class WindowGame : Game
         base.LoadContent();
     }
 
+    /// <summary>
+    /// Keeps the backbuffer exactly the size of the client area, then re-lays-out.
+    ///
+    /// Without this the two drift apart on any resize the app did not perform itself - a snap,
+    /// Win+Arrow, maximize, or a drag - because nothing else updates the preferred backbuffer size.
+    /// FNA then scales its old surface to fit the new client, and everything goes soft: at 800x600
+    /// in a maximized 1920x1032 window, a quarter of the menu-bar pixels turn into grey fringes.
+    /// For a look built on 1-bit glyphs and single-pixel bevels that is the difference between
+    /// crisp and wrong.
+    ///
+    /// This replaces the old per-path fix. Maximize used to set the backbuffer itself, which
+    /// covered the app's own maximize button and nothing else; hanging it off ClientSizeChanged
+    /// covers every way a window can change size, including the ones Windows performs for us.
+    /// </summary>
+    private void SyncBackBuffer()
+    {
+        if (_syncingBackBuffer) return;   // ApplyChanges can raise ClientSizeChanged again
+
+        int w = Window.ClientBounds.Width, h = Window.ClientBounds.Height;
+        if (w <= 0 || h <= 0) return;     // minimized: nothing to size to
+
+        // Compare against the ACTUAL render surface, not the preferred size. ClientSizeChanged does
+        // not always carry the final size - on a maximize it reports before Windows has settled, so
+        // trusting it leaves the surface stale and the window blurry. The viewport is ground truth,
+        // and Update calls this every frame, so whatever the event misses is caught next frame.
+        var vp = GraphicsDevice.Viewport;
+        if (vp.Width == w && vp.Height == h) return;
+
+        _syncingBackBuffer = true;
+        try
+        {
+            Graphics.PreferredBackBufferWidth = w;
+            Graphics.PreferredBackBufferHeight = h;
+            Graphics.ApplyChanges();
+        }
+        catch { /* a transient device state during a resize is not worth crashing over */ }
+        finally { _syncingBackBuffer = false; }
+
+        Relayout();
+        RequestRedraw();   // the idle throttle would otherwise leave the pre-resize frame on screen
+    }
+
+    private bool _syncingBackBuffer;
+
     private void Relayout()
     {
         if (Root == null) return;
@@ -294,6 +338,7 @@ public class WindowGame : Game
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
+        SyncBackBuffer();                         // the surface must match the client, every frame
         SyncMaximized();                          // snap/Win+Up change it behind our back
 
         double dt = gameTime.ElapsedGameTime.TotalMilliseconds;
