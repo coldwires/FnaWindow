@@ -472,6 +472,41 @@ MainThread.Post(() =>
 `WindowGame` drains the queue at the start of every `Update`, so posted actions run before the
 next frame. `MainThread.Post` is safe to call from any thread; the loop never blocks on a worker.
 
+## Using the machine's own Windows 3.1 fonts
+
+The engine ships baked atlases so an app works out of the box. Override `UseSystemFonts` and it will
+instead rasterise the real thing at startup, from the fonts already installed on the machine:
+
+```csharp
+protected override bool UseSystemFonts => true;
+```
+
+That swaps in **MS Sans Serif** (`sserife.fon`) for UI text, the same face bold and a size up for the
+title bar and menus, and raster **Courier** (`coure.fon`) for the editor grid. Anything missing
+leaves the shipped atlas in place, so this cannot leave an app without a font, and on non-Windows it
+does nothing.
+
+Two reasons to want it:
+
+- **They are the genuine faces this look imitates**, and they ship with every copy of Windows.
+  Because they are bitmap fonts there is no hinting or antialiasing involved, so they render
+  identically on every machine - which a TrueType face rasterised at 11px does not.
+- **Nothing is redistributed.** A font on the user's machine is licensed to that user. An atlas
+  baked from it and shipped inside a product is a copy, and Microsoft's faces are not yours to hand
+  out. Rasterising at startup avoids the question rather than managing it.
+
+`BitmapFont.FromSystemFont` does the work and is public if you want a specific face; check
+`BitmapFont.HasFamily` first, because **GDI substitutes silently** - ask for a font it does not have
+and it returns a different one without a word. Note that GDI+ (and therefore the bake tool) cannot
+load raster fonts at all: request "MS Sans Serif" through it and you get Microsoft Sans Serif, a
+different typeface. That is why this path uses plain GDI.
+
+Raster fonts only exist at the sizes baked into the file - MS Sans Serif at 13 and 16, Fixedsys 15,
+Courier 13, 16 and 20 - so ask for one that exists. The editor grid needs an 8px advance, and only
+Courier 13 and Fixedsys 15 provide it.
+
+---
+
 ## Gotchas
 
 - **ASCII-only fonts.** Unicode glyphs render as blanks. Draw shapes procedurally (see `TitleBar`'s arrow and bar glyphs).

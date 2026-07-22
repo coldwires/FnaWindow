@@ -13,7 +13,7 @@ namespace FnaWindow;
 /// Glyphs are white so <see cref="SpriteBatch"/> tints them to any color.
 /// No kerning; text is never scaled fractionally.
 /// </summary>
-public sealed class BitmapFont
+public sealed partial class BitmapFont
 {
     private readonly Texture2D _atlas;
     private readonly Dictionary<int, GlyphRec> _glyphs;

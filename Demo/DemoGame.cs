@@ -17,6 +17,10 @@ public sealed class DemoGame : WindowGame
 
     public DemoGame() : base("FnaWindow Demo") { }
 
+    // Use the machine's real Windows 3.1 faces (MS Sans Serif / Courier) rather than the shipped
+    // atlases. Nothing is redistributed this way - see WindowGame.UseSystemFonts.
+    protected override bool UseSystemFonts => true;
+
     // A software pointer is opt-in; the Demo uses the native OS cursor by default. To use one,
     // override BuildCursor and swap the PNG to taste, e.g.:
     //   protected override MouseCursor? BuildCursor()

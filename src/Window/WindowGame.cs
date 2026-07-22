@@ -139,6 +139,43 @@ public class WindowGame : Game
     /// </summary>
     protected virtual string? WindowIconPath => Path.Combine("Content", "appicon.png");
 
+    /// <summary>
+    /// Use the machine's own Windows 3.1 raster fonts instead of the atlases shipped with the
+    /// engine. Off by default, so nothing changes for an app that does not ask.
+    ///
+    /// Worth turning on for two reasons. It is the genuine article - MS Sans Serif, Fixedsys and
+    /// Courier are the faces this whole look imitates, they ship with every Windows, and being
+    /// bitmaps they render identically on every machine with no hinting or antialiasing in the way.
+    /// And nothing is redistributed: those fonts are licensed to the user who already has them,
+    /// whereas an atlas baked from them and shipped in a product is a copy of Microsoft's work.
+    ///
+    /// Any face that is missing leaves the shipped atlas in place, so this can never leave an app
+    /// without a font.
+    /// </summary>
+    protected virtual bool UseSystemFonts => false;
+
+    private void ApplySystemFonts()
+    {
+        if (!UseSystemFonts || !BitmapFont.Supported) return;
+
+        // Editor: raster Courier is 8px wide at its 13px size, which is the only size that fits the
+        // 8x15 editor cell - the 16px one is 9 wide and would break the monospace grid. It is two
+        // pixels short of the cell, so it is reported at 15 and nudged down one to sit centred.
+        Swap("Courier", 13, false, lineHeight: Theme.EditorCellH, yOffset: 1, f => EditorFont = f);
+
+        Swap("MS Sans Serif", 13, false, 0, 0, f => UiFont = f);
+        Swap("MS Sans Serif", 13, true,  0, 0, f => UiBoldFont = f);
+        // The chrome trick, kept: the caption and menu bar take the same face a size up and bold.
+        Swap("MS Sans Serif", 16, true,  0, 0, f => ChromeFont = f);
+
+        void Swap(string family, int px, bool bold, int lineHeight, int yOffset, Action<BitmapFont> assign)
+        {
+            if (!BitmapFont.HasFamily(family)) return;   // GDI substitutes silently; do not let it
+            var f = BitmapFont.FromSystemFont(GraphicsDevice, family, px, bold, lineHeight, yOffset);
+            if (f != null) assign(f);
+        }
+    }
+
     private void ApplyWindowIcon()
     {
         if (WindowIconPath is not { Length: > 0 } rel) return;
@@ -230,6 +267,10 @@ public class WindowGame : Game
         // caption and the menus are the bold System font, not the same size as body text.
         try { ChromeFont = BitmapFont.Load(GraphicsDevice, Path.Combine(fonts, "sserife_13_bold")); }
         catch { ChromeFont = null; }
+
+        // Then, if the app asked for it, replace those with the machine's own Windows 3.1 faces.
+        // Anything missing simply leaves the atlas above in place.
+        ApplySystemFonts();
         Renderer = new Win31Renderer(GraphicsDevice, Batch, UiFont, UiBoldFont, EditorFont);
 
         // The default look: authored Win 3.1 art for the chrome, and the 3.1 cursor set. Both fall
