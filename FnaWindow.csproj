@@ -7,7 +7,7 @@
     complete desktop program with 100% custom chrome. The runnable example lives in Demo/.
 
     Vendors FNA + its native libs under lib/ (self-contained: clone anywhere and build).
-    The engine source lives under src/ (Gui / Window / Theme). The Content fonts and the
+    The engine source lives under src/ (Gui / Window / Theme / Editor / IO / Concurrency / Audio). The Content fonts and the
     native fnalibs are shipped as Content, so they flow into any project that references
     this one - a consumer gets a working window with no extra asset wiring.
   -->
