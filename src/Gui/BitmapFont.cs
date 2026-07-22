@@ -9,7 +9,7 @@ namespace FnaWindow;
 
 /// <summary>
 /// A baked bitmap font: a PNG atlas of white glyphs + a JSON glyph map
-/// (char → x,y,w,h,advance), produced by tools/FontGen.
+/// (char -> x,y,w,h,advance), produced by tools/FontGen.
 /// Glyphs are white so <see cref="SpriteBatch"/> tints them to any color.
 /// No kerning; text is never scaled fractionally.
 /// </summary>
@@ -93,7 +93,7 @@ public sealed class BitmapFont
 
     private readonly record struct GlyphRec(Rectangle Src, int Advance, int XOff, int YOff);
 
-    // ── JSON DTOs (match tools/FontGen output) ────────────────────────────
+    // -- JSON DTOs (match tools/FontGen output) ----------------------------
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,

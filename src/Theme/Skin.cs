@@ -49,7 +49,7 @@ public abstract class Skin
     public virtual int MdiChildTitleHeight => 19;
     public virtual int ScrollBarThickness => 16;
 
-    // ── Small glyph-bearing buttons (title caption + scrollbar) ───────────
+    // -- Small glyph-bearing buttons (title caption + scrollbar) -----------
     // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
     // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.
 

@@ -16,7 +16,7 @@ internal static class WindowChrome
 {
     public static bool Supported => OperatingSystem.IsWindows();
 
-    // ── SDL3 ──────────────────────────────────────────────────────────────
+    // -- SDL3 --------------------------------------------------------------
     private const string SDL = "SDL3";
     private const string PROP_WIN32_HWND = "SDL.window.win32.hwnd";
 
@@ -58,7 +58,7 @@ internal static class WindowChrome
         return new Point((int)x, (int)y);
     }
 
-    // ── Win32 (strip the frame) ───────────────────────────────────────────
+    // -- Win32 (strip the frame) -------------------------------------------
     private const int GWL_STYLE = -16;
     private const long WS_POPUP = 0x80000000L;
     private const long WS_VISIBLE = 0x10000000L;
@@ -120,10 +120,10 @@ internal static class WindowChrome
         return new Rectangle(0, 0, 1024, 768);
     }
 
-    // ── WM_NCHITTEST subclassing (native drag / resize / Aero Snap) ───────
+    // -- WM_NCHITTEST subclassing (native drag / resize / Aero Snap) -------
     // Instead of moving the window from Update (which fights WM_PAINT timing and greys the
-    // window), we answer WM_NCHITTEST: HTCAPTION over the title bar → Windows drags it (with
-    // snap); HTLEFT/HTBOTTOMRIGHT/... near edges → Windows resizes it. FNA/SDL still gets
+    // window), we answer WM_NCHITTEST: HTCAPTION over the title bar -> Windows drags it (with
+    // snap); HTLEFT/HTBOTTOMRIGHT/... near edges -> Windows resizes it. FNA/SDL still gets
     // every other message via the chained original WndProc.
     public const int HTCLIENT = 1, HTCAPTION = 2, HTLEFT = 10, HTRIGHT = 11, HTTOP = 12,
         HTTOPLEFT = 13, HTTOPRIGHT = 14, HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17;
@@ -144,7 +144,7 @@ internal static class WindowChrome
 
     [StructLayout(LayoutKind.Sequential)] private struct POINTL { public int X, Y; }
 
-    /// <summary>Subclasses the window so <paramref name="hitTest"/>(clientX, clientY) → a HT* code
+    /// <summary>Subclasses the window so <paramref name="hitTest"/>(clientX, clientY) -> a HT* code
     /// drives native move/resize. Returning <see cref="HTCLIENT"/> keeps normal widget behavior.</summary>
     public static void InstallHitTest(IntPtr hwnd, Func<int, int, int> hitTest)
     {

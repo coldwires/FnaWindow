@@ -9,10 +9,10 @@ namespace FnaWindow;
 /// <summary>
 /// The reusable base window. Subclass it and override <see cref="BuildUi"/> to populate the
 /// <see cref="WindowFrame"/> (menu / content / status). It handles the rest:
-///  • a borderless OS window (Win32) whose own navy title bar is the caption,
-///  • native drag / resize / Aero-snap via WM_NCHITTEST,
-///  • a capped, re-entrancy-safe render loop,
-///  • the widget tree, input snapshot, and PointClamp renderer.
+///  - a borderless OS window (Win32) whose own navy title bar is the caption,
+///  - native drag / resize / Aero-snap via WM_NCHITTEST,
+///  - a capped, re-entrancy-safe render loop,
+///  - the widget tree, input snapshot, and PointClamp renderer.
 /// On non-Windows platforms it falls back to the normal OS frame.
 /// </summary>
 public class WindowGame : Game
@@ -300,7 +300,7 @@ public class WindowGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        // Windows sends WM_PAINT synchronously during move/resize → a re-entrant Draw. Guard it,
+        // Windows sends WM_PAINT synchronously during move/resize -> a re-entrant Draw. Guard it,
         // and always balance Begin/End even if a widget throws.
         if (_inDraw) return;
         _inDraw = true;
@@ -351,7 +351,7 @@ public class WindowGame : Game
         rt.SaveAsPng(fs, vp.Width, vp.Height);
     }
 
-    // ── Native window management ──────────────────────────────────────────
+    // -- Native window management ------------------------------------------
     private void ToggleMaximize()
     {
         if (!_borderless) { Graphics.ToggleFullScreen(); Relayout(); return; }

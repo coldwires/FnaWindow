@@ -7,13 +7,13 @@ namespace FnaWindow;
 /// <summary>
 /// Win31Renderer - every pixel of chrome comes through here: solid fills, the four
 /// bevel styles, and bitmap text with Win 3.1 mnemonic underlines.
-/// A single 1×1 white texture is stretched for all fills/borders; nothing is
+/// A single 1x1 white texture is stretched for all fills/borders; nothing is
 /// anti-aliased (the owning SpriteBatch uses SamplerState.PointClamp).
 /// </summary>
 public sealed class Win31Renderer
 {
     private readonly Texture2D _pixel;
-    private readonly Texture2D _dither; // 2×2 Face/LightEdge checker (scrollbar tracks)
+    private readonly Texture2D _dither; // 2x2 Face/LightEdge checker (scrollbar tracks)
 
     public SpriteBatch Sb { get; }
     private readonly BitmapFont _uiFont;
@@ -31,7 +31,7 @@ public sealed class Win31Renderer
         _pixel = new Texture2D(gd, 1, 1);
         _pixel.SetData(new[] { Color.White });
 
-        // 64×64 checker of the 2×2 Face/LightEdge dither pattern. Tiled
+        // 64x64 checker of the 2x2 Face/LightEdge dither pattern. Tiled
         // across scrollbar tracks; period 2 so even-offset tiling keeps phase.
         const int D = 64;
         var px = new Color[D * D];
@@ -42,7 +42,7 @@ public sealed class Win31Renderer
         _dither.SetData(px);
     }
 
-    /// <summary>Fills a rectangle with the 2×2 Face/LightEdge checker (scrollbar track).</summary>
+    /// <summary>Fills a rectangle with the 2x2 Face/LightEdge checker (scrollbar track).</summary>
     public void DrawDither(Rectangle r)
     {
         const int D = 64;
@@ -57,7 +57,7 @@ public sealed class Win31Renderer
         }
     }
 
-    // ── Primitive fills ───────────────────────────────────────────────────
+    // -- Primitive fills ---------------------------------------------------
     public void Fill(Rectangle r, Color c) => Sb.Draw(_pixel, r, c);
     public void Fill(int x, int y, int w, int h, Color c) => Sb.Draw(_pixel, new Rectangle(x, y, w, h), c);
 
@@ -89,7 +89,7 @@ public sealed class Win31Renderer
         VLine(r.Right - 1, r.Top, r.Height, c);
     }
 
-    // ── Bevels (forwarded to the active skin) ─────────────────────────────
+    // -- Bevels (forwarded to the active skin) -----------------------------
     // The look of panels/bevels lives in the active Skin (default Win31Skin), so a skin swap can
     // change chrome drawing without touching a single widget. See src/Theme/Skin.cs.
 
@@ -103,7 +103,7 @@ public sealed class Win31Renderer
     public static Rectangle Inset(Rectangle r, int n)
         => new(r.X + n, r.Y + n, r.Width - 2 * n, r.Height - 2 * n);
 
-    // ── Text ──────────────────────────────────────────────────────────────
+    // -- Text --------------------------------------------------------------
     public void DrawText(BitmapFont font, string s, int x, int y, Color color) => ThemeManager.Skin.DrawText(this, font, s, x, y, color);
     public void DrawText(BitmapFont font, string s, Point p, Color color) => ThemeManager.Skin.DrawText(this, font, s, p.X, p.Y, color);
 

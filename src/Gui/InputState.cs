@@ -120,7 +120,7 @@ public sealed class InputState
         }
     }
 
-    // ── Keyboard ──────────────────────────────────────────────────────────
+    // -- Keyboard ----------------------------------------------------------
     /// <summary>True on initial press and on each auto-repeat tick.</summary>
     public bool Pressed(Keys k) => _pressed.Contains(k);
     public bool Down(Keys k) => _kb.IsKeyDown(k);
@@ -132,7 +132,7 @@ public sealed class InputState
 
     public IReadOnlyList<char> TypedChars => _typed;
 
-    // ── Mouse ───────────────────────────────────────────────────────────��─
+    // -- Mouse --------------------------------------------------------------
     public bool LeftDown => _mouse.LeftButton == ButtonState.Pressed;
     public bool LeftPressed => _mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released;
     public bool LeftReleased => _mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed;

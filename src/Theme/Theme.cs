@@ -12,7 +12,7 @@ public static class Theme
 {
     private static Color Rgb(int r, int g, int b) => new(r, g, b);
 
-    // ── Palette (mutable; see class summary) ──────────────────────────────
+    // -- Palette (mutable; see class summary) ------------------------------
     public static Color Face          = Rgb(0xC6, 0xC6, 0xC6); // all chrome surfaces
     public static Color LightEdge     = Rgb(0xFF, 0xFF, 0xFF); // raised top/left
     public static Color DarkEdge      = Rgb(0x40, 0x40, 0x40); // raised bottom/right (outer)
@@ -43,7 +43,7 @@ public static class Theme
         (int)(a.G + (b.G - a.G) * t),
         (int)(a.B + (b.B - a.B) * t));
 
-    // ── Metrics ───────────────────────────────────────────────────────────
+    // -- Metrics -----------------------------------------------------------
     // Height/size metrics come from the active skin (a bigger-font skin needs taller rows); the
     // defaults are the classic Win 3.1 values held in the Skin base. The rest are consts.
     public static int TitleBarHeight      => ThemeManager.Skin.TitleBarHeight;
