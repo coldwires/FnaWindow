@@ -106,7 +106,7 @@ public abstract class Widget
 - **`Layout`** sets `Bounds` on children (top-down). Call `base.Layout()` to recurse.
 - **`Update`** reads `InputState` (edge-detected mouse/keyboard, `TypedChars`, wheel, double-click).
 - **`Draw`** paints with the `Win31Renderer`.
-- **`Root()`** walks up to the `RootDesktop`; check `Root()?.Popup.IsOpen` to ignore input while a menu/dialog is up.
+- **`Root()`** walks up to the `RootDesktop`. To ignore input while a menu or dialog is up, check **`InputBlocked`**, not `Popup.IsOpen` - see [Gotchas](#gotchas) for why the difference matters.
 
 ---
 
@@ -123,7 +123,7 @@ public sealed class Counter : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        if (Root()?.Popup.IsOpen == true) return;         // let menus/dialogs be modal
+        if (InputBlocked) return;                        // let menus/dialogs be modal
         if (input.LeftPressed && _btn.Contains(input.Mouse)) _n++;
     }
 
@@ -454,6 +454,7 @@ next frame. `MainThread.Post` is safe to call from any thread; the loop never bl
 
 - **ASCII-only fonts.** Unicode glyphs render as blanks. Draw shapes procedurally (see `TitleBar`'s arrow and bar glyphs).
 - **Don't mutate `Children` during `Update`.** If a click needs to add/remove widgets, queue it and apply after the update loop (as `WindowFrame` does for dialogs).
-- **Guard input while popups are open.** Early-return on `Root()?.Popup.IsOpen == true` in custom widgets, or let `WindowFrame` do it for content you host in the frame.
+- **Guard input while popups are open.** Early-return on `InputBlocked` in custom widgets, or let `WindowFrame` do it for content you host in the frame. Do **not** test `Popup.IsOpen` for this: a menu closes partway through the frame, on the click that chose an item, so `IsOpen` is already false while that click is still being delivered - and it then also lands on whatever the menu was covering. `InputBlocked` uses `BlocksInput`, which stays true for the rest of that frame, and additionally returns false for the popup's own contents, so a widget you put inside a dialog is not made dead by its own dialog.
+- **Dispose a `Texture2D` you only used to decode a PNG.** `Texture2D.FromStream` followed by `GetData`, to hand the pixels somewhere else, leaves a graphics resource for the finalizer, and FNA prints "A resource of type Texture2D was not Disposed" once per leak when the app exits. Wrap it in `using`. Textures you keep and draw with are fine as they are.
 - **Read colors from `Theme` at draw time** so themes work; if you must cache, invalidate on `ThemeManager.Changed`.
 - **Clip long content yourself.** There's no automatic scissor; use `Win31Renderer`'s scissor helpers or truncate/scroll (see `ScrollBar`).
