@@ -115,7 +115,77 @@ public sealed class MenuBar : Widget
                     if (key != '\0' && input.Pressed(LetterKey(key))) { OpenMenu(i); break; }
                 }
             }
+
+            if (DispatchShortcuts && !InputBlocked) DispatchShortcut(input);
         }
+    }
+
+    /// <summary>
+    /// Act on the accelerators the items advertise in <see cref="MenuItemDef.Shortcut"/>. Off by
+    /// default: the shortcut text has always been decorative, so an app may already bind the same
+    /// keys itself - a focused <see cref="TextArea"/> handles Ctrl+X/C/V - and firing both would
+    /// paste twice. Turn it on per app once its own bindings have been checked.
+    /// </summary>
+    public bool DispatchShortcuts;
+
+    private void DispatchShortcut(InputState input)
+    {
+        foreach (var menu in Menus)
+            foreach (var item in menu.Items)
+            {
+                if (item.IsSeparator || !item.Enabled || item.Shortcut == null || item.OnClick == null) continue;
+                if (!Matches(item.Shortcut, input)) continue;
+                item.OnClick.Invoke();
+                return;
+            }
+    }
+
+    /// <summary>Parses "Ctrl+Shift+S" style text and reports whether it is pressed right now.
+    /// Modifiers not named must be UP, so Ctrl+S cannot fire a Ctrl+Shift+S item.</summary>
+    private static bool Matches(string shortcut, InputState input)
+    {
+        bool ctrl = false, shift = false, alt = false;
+        string keyName = "";
+        foreach (var raw in shortcut.Split('+'))
+        {
+            string part = raw.Trim();
+            if (part.Length == 0) continue;
+            if (part.Equals("Ctrl", StringComparison.OrdinalIgnoreCase)) ctrl = true;
+            else if (part.Equals("Shift", StringComparison.OrdinalIgnoreCase)) shift = true;
+            else if (part.Equals("Alt", StringComparison.OrdinalIgnoreCase)) alt = true;
+            else keyName = part;
+        }
+        if (ctrl != input.Ctrl || shift != input.Shift || alt != input.Alt) return false;
+        var key = ParseKey(keyName);
+        return key != Keys.None && input.Pressed(key);
+    }
+
+    private static Keys ParseKey(string name)
+    {
+        if (name.Length == 1)
+        {
+            char c = char.ToLowerInvariant(name[0]);
+            if (c is >= 'a' and <= 'z') return Keys.A + (c - 'a');
+            if (c is >= '0' and <= '9') return Keys.D0 + (c - '0');
+        }
+        if (name.Length >= 2 && (name[0] == 'F' || name[0] == 'f')
+            && int.TryParse(name.Substring(1), out int fn) && fn is >= 1 and <= 12)
+            return Keys.F1 + (fn - 1);
+
+        return name.ToLowerInvariant() switch
+        {
+            "del" or "delete" => Keys.Delete,
+            "ins" or "insert" => Keys.Insert,
+            "esc" or "escape" => Keys.Escape,
+            "enter" or "return" => Keys.Enter,
+            "tab" => Keys.Tab,
+            "space" => Keys.Space,
+            "home" => Keys.Home,
+            "end" => Keys.End,
+            "pgup" or "pageup" => Keys.PageUp,
+            "pgdn" or "pagedown" => Keys.PageDown,
+            _ => Keys.None,
+        };
     }
 
     public void OpenMenu(int index)
