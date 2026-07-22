@@ -70,6 +70,37 @@ public sealed partial class BitmapFont
     public int AdvanceOf(char c)
         => _glyphs.TryGetValue(c, out var g) ? g.Advance : CellWidth;
 
+    /// <summary>
+    /// Clips <paramref name="s"/> to <paramref name="maxW"/> pixels, appending "..." when it had
+    /// to cut. Every caller that shows a label in a fixed cell - status bar, list row, menu, tool
+    /// card - wants this, and the obvious version (chop one character, re-measure the whole
+    /// string, repeat) is quadratic and allocates a string per step. This accumulates advances
+    /// instead and cuts once.
+    /// </summary>
+    public string Fit(string s, int maxW)
+    {
+        if (MeasureWidth(s) <= maxW) return s;
+        int budget = maxW - MeasureWidth("...");
+        if (budget <= 0) return "...";
+        int w = 0, n = 0;
+        while (n < s.Length && w + AdvanceOf(s[n]) <= budget) { w += AdvanceOf(s[n]); n++; }
+        return s.Substring(0, n) + "...";
+    }
+
+    /// <summary>
+    /// Like <see cref="Fit"/>, but keeps the END of the string and puts the ellipsis in front.
+    /// What a path wants: the folder you are in matters more than the drive letter.
+    /// </summary>
+    public string FitRight(string s, int maxW)
+    {
+        if (MeasureWidth(s) <= maxW) return s;
+        int budget = maxW - MeasureWidth("...");
+        if (budget <= 0) return "...";
+        int w = 0, n = s.Length;
+        while (n > 0 && w + AdvanceOf(s[n - 1]) <= budget) { w += AdvanceOf(s[n - 1]); n--; }
+        return "..." + s.Substring(n);
+    }
+
     /// <summary>Draws a single line of text, top-left at (<paramref name="x"/>,<paramref name="y"/>).</summary>
     public void Draw(SpriteBatch sb, string s, int x, int y, Color color)
     {
