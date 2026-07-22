@@ -33,6 +33,7 @@ public sealed class DemoGame : WindowGame
         var file = new List<MenuItemDef>
         {
             MenuItemDef.Item("&Open...", null, () => ShowOpen(frame)),
+            MenuItemDef.Item("&Find and Replace...", null, () => ShowForm(frame)),
             MenuItemDef.Item("&Save Screenshot", null, () =>
             {
                 var path = CaptureScreenshot();
@@ -87,6 +88,25 @@ public sealed class DemoGame : WindowGame
             OnOk = path => { _status.Message = "Chose " + Path.GetFileName(path); frame.CloseDialog(); },
             OnCancel = frame.CloseDialog,
         };
+        frame.ShowDialog(dlg);
+    }
+
+    // Exercises FormDialog - the multi-field modal. Like RetroFileDialog before it, nothing else in
+    // this repo runs it, so without this entry it would go untested.
+    private void ShowForm(WindowFrame frame)
+    {
+        var dlg = new FormDialog("Find and Replace")
+            .AddField("Find what:", "grafix")
+            .AddField("Replace with:", "graphics")
+            .AddCheck("Match case")
+            .AddCheck("Whole word only", true);
+        dlg.OkLabel = "Replace All";
+        dlg.OnOk = v =>
+        {
+            _status.Message = $"Replace '{v.Text(0)}' with '{v.Text(1)}' (case={v.Check(0)}, whole={v.Check(1)})";
+            frame.CloseDialog();
+        };
+        dlg.OnCancel = frame.CloseDialog;
         frame.ShowDialog(dlg);
     }
 

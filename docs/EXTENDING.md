@@ -228,6 +228,21 @@ frame.ShowDialog(new InputDialog("MyApp", "Save changes to " + name + "?", "")
 
 The dialog auto-sizes its height to the prompt and centers itself.
 
+`FormDialog` is the multi-field one: any number of labelled text fields and check boxes, for a Find and Replace, a copy-to box, or anything the single field of `InputDialog` cannot hold. Build it by chaining:
+
+```csharp
+var dlg = new FormDialog("Replace")
+    .AddField("Find what:", term)
+    .AddField("Replace with:", "")
+    .AddCheck("Match case");
+dlg.OkLabel = "Replace All";
+dlg.OnOk = v => Replace(v.Text(0), v.Text(1), v.Check(0));
+dlg.OnCancel = frame.CloseDialog;
+frame.ShowDialog(dlg);
+```
+
+Tab (and Shift+Tab) moves between fields, Enter is OK, Esc is Cancel. `InputDialog` is still the right choice for one field, a confirm or a message - this is its bigger sibling, not a replacement.
+
 `RetroFileDialog` picks a path. It browses directories and drives, filters by pattern, and reads each directory on a background thread so a slow network path cannot freeze the window:
 
 ```csharp
