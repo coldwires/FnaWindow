@@ -68,6 +68,22 @@ public sealed class TextBuffer
         Apply(start, end, "", coalescable: false);
     }
 
+    /// <summary>
+    /// Replaces the range [start, end) with <paramref name="text"/> as ONE edit, and therefore as one
+    /// undo step. Every edit in this class is a range replacement underneath; this just exposes it.
+    ///
+    /// Reach for it instead of Delete-then-Insert whenever the pair is logically a single change -
+    /// Replace All over a document being the obvious case. Spelled as two edits, one Ctrl+Z leaves
+    /// the document in a state the user never asked for. This is also not <see cref="SetText"/>,
+    /// which throws the undo history away entirely.
+    /// </summary>
+    public void Replace(Position start, Position end, string text)
+    {
+        text = Normalize(text ?? "");
+        if (start.CompareTo(end) == 0 && text.Length == 0) return;
+        Apply(start, end, text, coalescable: false);
+    }
+
     /// <summary>Signals a boundary (caret move, mouse click) so the next typed char starts a new undo group.</summary>
     public void BreakUndoCoalescing() => _coalesceAnchor = null;
 
