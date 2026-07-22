@@ -17,7 +17,7 @@ public sealed class DemoContent : Widget
         "A borderless, themeable, Windows 3.1-styled window engine on FNA.",
         "",
         "Try it:",
-        "  -  Drag the title bar to move the window (Aero-snap works).",
+        "  -  Drag the title bar to move the window; drag it to an edge or corner to snap.",
         "  -  Drag any edge or the bottom-right grip to resize.",
         "  -  The title-bar buttons maximize, minimize, and close.",
         "  -  Open the Themes menu to reskin the whole UI at runtime.",

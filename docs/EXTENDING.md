@@ -370,10 +370,17 @@ pre-highlighted text), subscribe to `ThemeManager.Changed` and invalidate.
 
 On Windows, `WindowChrome`:
 
-1. **Strips the frame.** `SetWindowLongPtr(GWL_STYLE)` removes `WS_CAPTION | WS_THICKFRAME | ...` and sets `WS_POPUP`, then sizes the client to the backbuffer (client == backbuffer keeps FNA3D rendering crisp).
-2. **Subclasses the window proc** and answers **`WM_NCHITTEST`**: it maps a client point to a non-client code, `HTCAPTION` over the title bar's drag area, `HTLEFT`/`HTBOTTOMRIGHT`/etc. near the edges, otherwise `HTCLIENT`. Windows then handles the dragging, resizing, and Aero snap itself.
+1. **Subclasses the window proc first**, so the two messages below are ours before anything triggers them.
+2. **Keeps every frame style and hides the frame instead.** The window keeps `WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU` and is *not* a `WS_POPUP`. **`WM_NCCALCSIZE`** then collapses the non-client area to nothing, so the caption and border are never drawn while the window stays, to Windows, an ordinary application window.
+3. **Answers `WM_NCHITTEST`**: it maps a client point to a non-client code, `HTCAPTION` over the title bar's drag area, `HTLEFT`/`HTBOTTOMRIGHT`/etc. near the edges, otherwise `HTCLIENT`. Windows then handles dragging and resizing itself.
 
-`WindowGame` supplies the hit-test (`WindowHitTest`) using `Frame.Title.IsOnDragArea(pt)` plus a 4px edge border, drives min/maximize/close from the `TitleBar` buttons, and re-asserts the borderless style each frame (SDL can re-add it). To change the drag region, override the title bar or the hit-test.
+**Why not just set `WS_POPUP`?** Because that is what the engine used to do, and it silently costs everything the shell hangs off those styles. `WS_THICKFRAME` is what makes a window *snappable* - without it, dragging to a screen edge or corner does nothing at all, and neither does Win+Arrow. `WS_MAXIMIZEBOX` drives Snap Layouts and Win+Up, `WS_MINIMIZEBOX` is what lets a taskbar click minimize an active window (and gives the minimize animation), and `WS_SYSMENU` is Alt+Space and the taskbar's right-click window menu. Answering `WM_NCHITTEST` with `HTCAPTION` gets you *dragging*, which looks like enough until you try to snap.
+
+**Order matters.** `WM_NCCALCSIZE` arrives the moment the styles change, so the subclass must be installed *before* the styles are applied. The other way round, the original window proc answers it and the client area keeps a full frame's worth of inset permanently, because nothing sends another one until the next resize.
+
+**Maximize goes through the OS.** `ShowWindow(SW_MAXIMIZE/SW_RESTORE)` and `IsZoomed`, not a private "am I maximized" flag - Windows can maximize the window too (snap, Win+Up, the taskbar menu), so there is one answer and the OS owns it. `WindowGame` re-reads it each frame to keep the caption's restore glyph honest. Maximized is also the one case where `WM_NCCALCSIZE` does *not* return the full rect: Windows sizes a maximized window so its frame overhangs every edge, so the client is inset by that frame or the top rows vanish and the bottom runs under the taskbar.
+
+`WindowGame` supplies the hit-test (`WindowHitTest`) using `Frame.Title.IsOnDragArea(pt)` plus a 4px edge border, drives min/maximize/close from the `TitleBar` buttons, and re-asserts the styles each frame (SDL can change them). To change the drag region, override the title bar or the hit-test.
 
 On non-Windows platforms `WindowChrome.Supported` is `false` and you get the normal OS frame. The rest of the toolkit is identical.
 

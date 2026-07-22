@@ -9,8 +9,10 @@ namespace FnaWindow;
 /// <summary>
 /// The reusable base window. Subclass it and override <see cref="BuildUi"/> to populate the
 /// <see cref="WindowFrame"/> (menu / content / status). It handles the rest:
-///  - a borderless OS window (Win32) whose own navy title bar is the caption,
-///  - native drag / resize / Aero-snap via WM_NCHITTEST,
+///  - a borderless OS window (Win32) whose own navy title bar is the caption. It stays a NORMAL
+///    framed window to Windows - the frame styles are kept and WM_NCCALCSIZE collapses the
+///    non-client area - so snap, Snap Layouts, Win+Arrow, the taskbar and Alt+Space all work,
+///  - native drag / resize via WM_NCHITTEST,
 ///  - a capped, re-entrancy-safe render loop,
 ///  - the widget tree, input snapshot, and PointClamp renderer.
 /// On non-Windows platforms it falls back to the normal OS frame.
@@ -44,7 +46,6 @@ public class WindowGame : Game
     private readonly string _titleText;
     private IntPtr _sdlWindow, _hwnd;
     private bool _borderless, _maximized, _inDraw;
-    private Rectangle _restore;
 
     // Optional: set env var FNAWINDOW_SHOT=<path> to save a PNG of the window and exit (docs/CI).
     private readonly string? _shotPath = Environment.GetEnvironmentVariable("FNAWINDOW_SHOT");
@@ -264,8 +265,13 @@ public class WindowGame : Game
             _hwnd = WindowChrome.GetHwnd(_sdlWindow);
             if (_hwnd != IntPtr.Zero)
             {
-                WindowChrome.MakeBorderless(_hwnd, Graphics.PreferredBackBufferWidth, Graphics.PreferredBackBufferHeight);
+                // Subclass FIRST. MakeBorderless changes the styles and asks for a frame change,
+                // which makes Windows send WM_NCCALCSIZE straight away - and that message is where
+                // the frame is collapsed. Installed the other way round, the original wndproc
+                // answers it and the client area keeps a full frame's worth of inset for good,
+                // since nothing sends another one until the window is next resized.
                 WindowChrome.InstallHitTest(_hwnd, WindowHitTest);
+                WindowChrome.MakeBorderless(_hwnd, Graphics.PreferredBackBufferWidth, Graphics.PreferredBackBufferHeight);
                 _borderless = true;
             }
         }
@@ -288,6 +294,7 @@ public class WindowGame : Game
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
+        SyncMaximized();                          // snap/Win+Up change it behind our back
 
         double dt = gameTime.ElapsedGameTime.TotalMilliseconds;
         if (_flashMs > 0) _flashMs = Math.Max(0, _flashMs - dt);
@@ -359,31 +366,26 @@ public class WindowGame : Game
     private void ToggleMaximize()
     {
         if (!_borderless) { Graphics.ToggleFullScreen(); Relayout(); return; }
-        if (!_maximized)
-        {
-            WindowChrome.GetWindowPosition(_sdlWindow, out int wx, out int wy);
-            WindowChrome.GetWindowSize(_sdlWindow, out int ww, out int wh);
-            _restore = new Rectangle(wx, wy, ww, wh);
-            var wa = WindowChrome.WorkArea();
-            ApplyWindow(wa.X, wa.Y, wa.Width, wa.Height, move: true);
-            _maximized = true;
-        }
-        else
-        {
-            ApplyWindow(_restore.X, _restore.Y, _restore.Width, _restore.Height, move: true);
-            _maximized = false;
-        }
-        Caption.Maximized = _maximized; // caption shows restore vs maximize glyph
+
+        // Through the OS, not by moving ourselves to the work area. The window is a normal framed
+        // window now, so Windows can maximize it too - snap, Win+Up, the taskbar menu - and an
+        // app-private "am I maximized" flag would immediately disagree. The OS owns the answer.
+        if (WindowChrome.IsMaximized(_hwnd)) WindowChrome.Restore(_hwnd);
+        else WindowChrome.Maximize(_hwnd);
+        // No Relayout here: the resize raises ClientSizeChanged, which does it. SyncMaximized picks
+        // the caption glyph up on the next frame.
     }
 
-    private void ApplyWindow(int x, int y, int w, int h, bool move)
+    /// <summary>Keeps the caption's restore/maximize glyph honest when something other than our own
+    /// button changed the state - a snap, Win+Up, or a double-click on the caption.</summary>
+    private void SyncMaximized()
     {
-        Graphics.PreferredBackBufferWidth = w;
-        Graphics.PreferredBackBufferHeight = h;
-        Graphics.ApplyChanges();
-        WindowChrome.SetWindowSize(_sdlWindow, w, h);
-        if (move) WindowChrome.SetWindowPosition(_sdlWindow, x, y);
-        Relayout();
+        if (!_borderless) return;
+        bool now = WindowChrome.IsMaximized(_hwnd);
+        if (now == _maximized) return;
+        _maximized = now;
+        Caption.Maximized = now;
+        RequestRedraw();
     }
 
     /// <summary>Maps a client point to a non-client hit code so Windows drags/resizes natively.</summary>

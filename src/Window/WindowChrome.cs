@@ -5,8 +5,9 @@ using Microsoft.Xna.Framework;
 namespace FnaWindow;
 
 /// <summary>
-/// Native glue to turn the FNA window into a true borderless window - no OS title bar or
-/// frame, so only our Win 3.1 chrome shows. Adapted from the fna-desktop-pet interop, but
+/// Native glue that hides the OS title bar and frame so only our Win 3.1 chrome shows, while
+/// leaving the window a normal application window to Windows (see MakeBorderless for why that
+/// distinction is load-bearing). Adapted from the fna-desktop-pet interop, but
 /// without the layered/color-key/topmost bits (we're opaque). Also exposes SDL3 helpers to
 /// move/resize the window and read the global cursor so our own title bar can drag it.
 /// Windows-only; on other platforms <see cref="Supported"/> is false and the app keeps its
@@ -58,7 +59,7 @@ internal static class WindowChrome
         return new Point((int)x, (int)y);
     }
 
-    // -- Win32 (strip the frame) -------------------------------------------
+    // -- Win32 (hide the frame, keep the window) ---------------------------
     private const int GWL_STYLE = -16;
     private const long WS_POPUP = 0x80000000L;
     private const long WS_VISIBLE = 0x10000000L;
@@ -83,33 +84,69 @@ internal static class WindowChrome
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, ref RECT pvParam, uint fWinIni);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsZoomed(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
+
+    private const int SW_MAXIMIZE = 3, SW_RESTORE = 9;
+    private const int SM_CXSIZEFRAME = 32, SM_CYSIZEFRAME = 33, SM_CXPADDEDBORDER = 92;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
 
-    /// <summary>Strips the OS frame to a bare WS_POPUP and sizes the client to the backbuffer
-    /// (client == backbuffer keeps FNA3D rendering straight to the swapchain - no blit blur).</summary>
+    /// <summary>
+    /// Hides the OS frame while leaving the window a NORMAL, fully framed window as far as Windows
+    /// is concerned. The frame bits stay ON and <c>WM_NCCALCSIZE</c> (below) collapses the
+    /// non-client area to nothing, so the caption and border are never drawn but the window keeps
+    /// everything the shell attaches to those styles.
+    ///
+    /// That distinction is the whole point. Stripping to a bare <c>WS_POPUP</c> - the obvious way,
+    /// and what this used to do - silently costs every behaviour Windows grants a real window:
+    /// <list type="bullet">
+    /// <item><c>WS_THICKFRAME</c> is what makes a window snappable. Without it, dragging to a screen
+    /// edge or corner does nothing, and Win+Arrow does nothing.</item>
+    /// <item><c>WS_MAXIMIZEBOX</c> drives Snap Layouts (the grid that appears over the maximize
+    /// button) and Win+Up.</item>
+    /// <item><c>WS_MINIMIZEBOX</c> is what lets clicking the taskbar button minimize an active
+    /// window, and gives the minimize/restore animation.</item>
+    /// <item><c>WS_SYSMENU</c> is the Alt+Space menu and the taskbar right-click window menu.</item>
+    /// </list>
+    /// Answering <c>WM_NCHITTEST</c> with <c>HTCAPTION</c> gets you dragging and edge-resizing, which
+    /// is why the old approach looked complete, but dragging is not snapping and none of the above
+    /// comes back on its own.
+    /// </summary>
     public static void MakeBorderless(IntPtr hwnd, int clientW, int clientH)
     {
         if (hwnd == IntPtr.Zero) return;
-        long style = (long)GetWindowLongPtr(hwnd, GWL_STYLE);
-        style &= ~FrameBits;
-        style |= WS_POPUP | WS_VISIBLE;
-        SetWindowLongPtr(hwnd, GWL_STYLE, new IntPtr(style));
+        ApplyFrameStyles(hwnd);
         SetWindowPos(hwnd, IntPtr.Zero, 0, 0, clientW, clientH, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
 
-    /// <summary>Re-strips the caption if something (SDL/FNA) re-added it. Cheap; call per-frame.</summary>
+    /// <summary>Re-applies the styles if something (SDL/FNA) changed them. Cheap; call per-frame.</summary>
     public static void EnsureBorderless(IntPtr hwnd)
     {
         if (hwnd == IntPtr.Zero) return;
         long style = (long)GetWindowLongPtr(hwnd, GWL_STYLE);
-        if ((style & FrameBits) == 0) return;
-        style &= ~FrameBits;
-        style |= WS_POPUP | WS_VISIBLE;
-        SetWindowLongPtr(hwnd, GWL_STYLE, new IntPtr(style));
+        if ((style & FrameBits) == FrameBits && (style & WS_POPUP) == 0) return; // already right
+        ApplyFrameStyles(hwnd);
         SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
+
+    private static void ApplyFrameStyles(IntPtr hwnd)
+    {
+        long style = (long)GetWindowLongPtr(hwnd, GWL_STYLE);
+        style &= ~WS_POPUP;      // a popup is not a normal window and cannot snap
+        style |= FrameBits | WS_VISIBLE;
+        SetWindowLongPtr(hwnd, GWL_STYLE, new IntPtr(style));
+    }
+
+    /// <summary>Maximize / restore through the OS, so the shell, snap and the taskbar all agree
+    /// about the state instead of the app keeping a private idea of it.</summary>
+    public static void Maximize(IntPtr hwnd) => ShowWindow(hwnd, SW_MAXIMIZE);
+    public static void Restore(IntPtr hwnd) => ShowWindow(hwnd, SW_RESTORE);
+    public static bool IsMaximized(IntPtr hwnd) => hwnd != IntPtr.Zero && IsZoomed(hwnd);
 
     /// <summary>The desktop work area (screen minus taskbar), for maximize.</summary>
     public static Rectangle WorkArea()
@@ -120,7 +157,7 @@ internal static class WindowChrome
         return new Rectangle(0, 0, 1024, 768);
     }
 
-    // -- WM_NCHITTEST subclassing (native drag / resize / Aero Snap) -------
+    // -- Subclassing: WM_NCCALCSIZE hides the frame, WM_NCHITTEST drives drag/resize ----
     // Instead of moving the window from Update (which fights WM_PAINT timing and greys the
     // window), we answer WM_NCHITTEST: HTCAPTION over the title bar -> Windows drags it (with
     // snap); HTLEFT/HTBOTTOMRIGHT/... near edges -> Windows resizes it. FNA/SDL still gets
@@ -130,6 +167,7 @@ internal static class WindowChrome
 
     private const int GWLP_WNDPROC = -4;
     private const uint WM_NCHITTEST = 0x0084;
+    private const uint WM_NCCALCSIZE = 0x0083;
 
     private delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -157,6 +195,28 @@ internal static class WindowChrome
 
     private static IntPtr HitTestProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
+        // The non-client area collapses to nothing, so the window keeps every frame style (and
+        // everything the shell hangs off them) while none of the frame is ever drawn. Returning 0
+        // with the proposed rectangle untouched means "the client area is the whole window".
+        if (msg == WM_NCCALCSIZE && wParam != IntPtr.Zero)
+        {
+            // Maximized is the exception. Windows sizes a maximized window so its frame hangs off
+            // all four edges, which is invisible on a normal window because the frame is where the
+            // overhang goes. With no non-client area the overhang eats the content instead: the top
+            // rows vanish and the bottom runs under the taskbar. Inset by the frame it assumed.
+            if (IsZoomed(hWnd))
+            {
+                int pad = GetSystemMetrics(SM_CXPADDEDBORDER);
+                int cx = GetSystemMetrics(SM_CXSIZEFRAME) + pad;
+                int cy = GetSystemMetrics(SM_CYSIZEFRAME) + pad;
+
+                var r = Marshal.PtrToStructure<RECT>(lParam); // first field of NCCALCSIZE_PARAMS
+                r.Left += cx; r.Top += cy; r.Right -= cx; r.Bottom -= cy;
+                Marshal.StructureToPtr(r, lParam, false);
+            }
+            return IntPtr.Zero;
+        }
+
         if (msg == WM_NCHITTEST && _hitTest != null)
         {
             long lp = lParam.ToInt64();
