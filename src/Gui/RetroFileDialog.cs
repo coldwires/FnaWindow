@@ -24,6 +24,7 @@ public sealed class RetroFileDialog : Widget
     private readonly bool _save;
     private readonly string _pattern;   // e.g. "*.cs" or "*.csproj;*.sln"
     private readonly string _title;
+    private readonly string? _defaultExt;  // appended to a save name with no extension; null = none
 
     private string _dir;
     private string _fileName;
@@ -33,18 +34,19 @@ public sealed class RetroFileDialog : Widget
     private readonly ListBox _list = new() { HandleKeys = false };
     private readonly DirectoryLoader _loader = new();
 
-    private Rectangle _fieldRect, _okRect, _cancelRect, _titleRect;
+    private Rectangle _fieldRect, _titleRect;
 
     // Drag by the caption, shared with the engine dialogs so every modal moves the same way.
     private readonly TitleDrag _drag = new();
 
-    private enum Btn { None, Ok, Cancel }
-    private Btn _armed = Btn.None;          // button the current press started on
-    private Btn _pressedVisual = Btn.None;  // button to draw depressed this frame
+    // OK/Cancel are the shared PushButton, laid out and pumped the way InputDialog does it.
+    private readonly PushButton _accept = new("");
+    private readonly PushButton _cancel = new("Cancel");
 
-    public RetroFileDialog(bool save, string pattern, string? initialDir, string? defaultName)
+    public RetroFileDialog(bool save, string pattern, string? initialDir, string? defaultName, string? defaultExt = null)
     {
         _save = save;
+        _defaultExt = defaultExt;
         _pattern = string.IsNullOrWhiteSpace(pattern) ? "*.*" : pattern;
         _title = save ? "Save As" : "Open";
         _fileName = defaultName ?? "";
@@ -97,8 +99,9 @@ public sealed class RetroFileDialog : Widget
         int listBottom = y + h - 44;
         _list.Bounds = new Rectangle(x + 14, listTop, w - 28, listBottom - listTop);
 
-        _okRect = new Rectangle(x + w - 170, y + h - 34, 72, 24);
-        _cancelRect = new Rectangle(x + w - 88, y + h - 34, 72, 24);
+        _accept.Label = _save ? "Save" : "Open";
+        _accept.Bounds = new Rectangle(x + w - 170, y + h - 34, 72, 24);
+        _cancel.Bounds = new Rectangle(x + w - 88, y + h - 34, 72, 24);
 
         base.Layout();
     }
@@ -134,30 +137,10 @@ public sealed class RetroFileDialog : Widget
         var bounds = Bounds;
         if (_drag.Update(input, _titleRect, Root()?.Bounds ?? Bounds, ref bounds)) { Bounds = bounds; Layout(); }
 
-        var m = input.Mouse;
-
-        // Buttons depress on press and fire on release-if-still-over (classic Win 3.1).
-        if (input.LeftPressed)
-        {
-            _armed = _okRect.Contains(m) ? Btn.Ok
-                   : _cancelRect.Contains(m) ? Btn.Cancel : Btn.None;
-        }
-
-        // Depress visual: the armed button, while the mouse is still held down over it.
-        _pressedVisual = input.LeftDown && _armed != Btn.None && RectOf(_armed).Contains(m) ? _armed : Btn.None;
-
-        if (input.LeftReleased)
-        {
-            if (_armed == Btn.Ok && _okRect.Contains(m)) { _armed = Btn.None; AcceptOrOpen(); return; }
-            if (_armed == Btn.Cancel && _cancelRect.Contains(m)) { _armed = Btn.None; OnCancel?.Invoke(); return; }
-            _armed = Btn.None;
-        }
+        // OK/Cancel act on release, showing pressed while held (PushButton owns that behaviour).
+        if (_accept.Update(input)) { AcceptOrOpen(); return; }
+        if (_cancel.Update(input)) { OnCancel?.Invoke(); return; }
     }
-
-    private Rectangle RectOf(Btn b) => b switch
-    {
-        Btn.Ok => _okRect, Btn.Cancel => _cancelRect, _ => Rectangle.Empty,
-    };
 
     // The OK/Open action: accept the typed filename, else open the selected entry.
     private void AcceptOrOpen()
@@ -184,7 +167,7 @@ public sealed class RetroFileDialog : Widget
         // Typing a directory name navigates into it rather than accepting.
         if (Directory.Exists(candidate)) { Navigate(candidate); _fileName = ""; _caret = 0; return; }
 
-        if (_save && !Path.HasExtension(candidate)) candidate += ".cs"; // default extension
+        if (_save && _defaultExt != null && !Path.HasExtension(candidate)) candidate += _defaultExt;
         if (!_save && !File.Exists(candidate)) return;                  // Open requires an existing file
 
         try { OnOk?.Invoke(Path.GetFullPath(candidate)); }
@@ -243,19 +226,8 @@ public sealed class RetroFileDialog : Widget
         if (_loader.Loading && _entries.Count == 0)
             r.DrawText(font, "reading...", _list.Bounds.X + 6, _list.Bounds.Y + 3, Theme.TextDisabled);
 
-        DrawButton(r, _okRect, _save ? "Save" : "Open", _pressedVisual == Btn.Ok);
-        DrawButton(r, _cancelRect, "Cancel", _pressedVisual == Btn.Cancel);
-    }
-
-    private static void DrawButton(Win31Renderer r, Rectangle rect, string label, bool pressed)
-    {
-        // Pressed = sunken bevel + content nudged (+1,+1), the way Win 3.1 depresses a button.
-        r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
-        var inner = rect;
-        if (pressed) inner.Offset(1, 1);
-        int tw = r.UiFont.MeasureWidth(label);
-        r.DrawText(r.UiFont, label, inner.X + (inner.Width - tw) / 2,
-            inner.Y + (inner.Height - r.UiFont.LineHeight) / 2, Theme.Text);
+        _accept.Draw(r);
+        _cancel.Draw(r);
     }
 
     public override Widget? HitTest(Point p) => Bounds.Contains(p) ? this : null;
