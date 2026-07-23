@@ -35,8 +35,11 @@ public sealed class TitleDrag
             _dragging = true;
             _offset = new Point(m.X - bounds.X, m.Y - bounds.Y);
         }
-        if (input.LeftReleased) _dragging = false;
-        if (!_dragging || !input.LeftDown) return false;
+        // End the drag whenever the button is up, not only on the release edge: a lost release
+        // (alt-tab, focus change) would otherwise leave _dragging set, so the next press anywhere
+        // would jump the box using the stale offset.
+        if (!input.LeftDown) _dragging = false;
+        if (!_dragging) return false;
 
         int x = Math.Clamp(m.X - _offset.X, area.X, Math.Max(area.X, area.Right - bounds.Width));
         int y = Math.Clamp(m.Y - _offset.Y, area.Y, Math.Max(area.Y, area.Bottom - bounds.Height));

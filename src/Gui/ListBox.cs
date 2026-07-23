@@ -87,6 +87,9 @@ public class ListBox : Widget
 
     private void SyncScrollBar()
     {
+        // Keep the selection in range: a subclass that shrinks its own rows and only calls this could
+        // otherwise leave Selected past the end, and Enter would activate a stale, out-of-range index.
+        if (Selected >= RowCount) SetSelected(RowCount > 0 ? RowCount - 1 : -1, notify: false);
         VBar.ContentSize = Math.Max(1, RowCount);
         VBar.ViewSize = VisibleRows;
         ClampScroll();

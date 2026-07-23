@@ -30,6 +30,7 @@ public sealed class InputState
     private double _totalMs;
     private double _lastLeftDownMs = double.NegativeInfinity;
     private Point _lastLeftDownPos;
+    private int _wheelRemainder; // sub-notch wheel movement carried to the next frame
 
     public Point Mouse { get; private set; }
     public Point PrevMouse { get; private set; }
@@ -63,7 +64,11 @@ public sealed class InputState
 
         PrevMouse = new Point(_prevMouse.X, _prevMouse.Y);
         Mouse = new Point(_mouse.X, _mouse.Y);
-        WheelDelta = (_mouse.ScrollWheelValue - _prevMouse.ScrollWheelValue) / 120;
+        // Carry sub-notch wheel movement instead of truncating it away, so a precision touchpad or
+        // free-spin wheel that reports deltas under one 120-unit notch still scrolls.
+        int wheel = _wheelRemainder + (_mouse.ScrollWheelValue - _prevMouse.ScrollWheelValue);
+        WheelDelta = wheel / 120;
+        _wheelRemainder = wheel - WheelDelta * 120;
 
         // Key-repeat bookkeeping.
         _pressed.Clear();
