@@ -287,34 +287,24 @@ public sealed class Menu : Widget
         }
         int width = LeftPad + maxLabel + (maxShortcut > 0 ? Gap + maxShortcut : 0) + RightPad;
 
-        int height = 4; // top bevel + pad
+        int height = 6; // top bevel + pad (4) + bottom pad (2)
+        foreach (var it in _items) height += it.IsSeparator ? SepH : RowH;
+
+        // Clamp onto the screen on both axes: shift left if it runs off the right, and up if it runs
+        // off the bottom, so a long menu opened low does not draw rows past the edge where they are
+        // unreachable. Then lay the rows out once at the final origin.
+        int x = Anchor.X, top = Anchor.Y;
+        if (x + width > ScreenWidth) x = Math.Max(0, ScreenWidth - width);
+        if (top + height > ScreenHeight) top = Math.Max(0, ScreenHeight - height);
+        Bounds = new Rectangle(x, top, width, height);
+
         _rowRects.Clear();
-        int y = Anchor.Y + 2;
-        int x = Anchor.X;
+        int y = top + 2;
         foreach (var it in _items)
         {
             int h = it.IsSeparator ? SepH : RowH;
             _rowRects.Add(new Rectangle(x + 2, y, width - 4, h));
             y += h;
-            height += h;
-        }
-        height += 2;
-
-        // Clamp horizontally onto the screen.
-        if (x + width > ScreenWidth) x = Math.Max(0, ScreenWidth - width);
-        Bounds = new Rectangle(x, Anchor.Y, width, height);
-
-        // Recompute row rects if x shifted.
-        if (x != Anchor.X)
-        {
-            _rowRects.Clear();
-            int yy = Anchor.Y + 2;
-            foreach (var it in _items)
-            {
-                int h = it.IsSeparator ? SepH : RowH;
-                _rowRects.Add(new Rectangle(x + 2, yy, width - 4, h));
-                yy += h;
-            }
         }
     }
 

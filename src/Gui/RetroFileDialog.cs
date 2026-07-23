@@ -229,7 +229,7 @@ public sealed class RetroFileDialog : Widget
 
         r.DrawText(r.UiBoldFont, _title, x + 14, y + 14, Theme.Text);
         r.DrawText(font, "File Name:", x + 14, y + 40, Theme.Text);
-        r.DrawText(font, "Folder: " + TruncateLeft(font, _dir, Bounds.Width - 70), x + 14, y + 86, Theme.Text);
+        r.DrawText(font, "Folder: " + font.FitRight(_dir, Bounds.Width - 70), x + 14, y + 86, Theme.Text);
 
         // Filename field.
         r.DrawPanel(_fieldRect, BevelStyle.SunkenThick, Theme.WindowBg);
@@ -256,15 +256,6 @@ public sealed class RetroFileDialog : Widget
         int tw = r.UiFont.MeasureWidth(label);
         r.DrawText(r.UiFont, label, inner.X + (inner.Width - tw) / 2,
             inner.Y + (inner.Height - r.UiFont.LineHeight) / 2, Theme.Text);
-    }
-
-    // Trim a long path from the left, keeping the tail visible: "...\dir\sub".
-    private static string TruncateLeft(BitmapFont font, string s, int maxW)
-    {
-        if (font.MeasureWidth(s) <= maxW) return s;
-        int start = 0;
-        while (start < s.Length && font.MeasureWidth("..." + s.Substring(start)) > maxW) start++;
-        return "..." + s.Substring(Math.Min(start, s.Length));
     }
 
     public override Widget? HitTest(Point p) => Bounds.Contains(p) ? this : null;
