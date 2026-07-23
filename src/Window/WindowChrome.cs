@@ -89,9 +89,25 @@ internal static class WindowChrome
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsZoomed(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
+    [DllImport("user32.dll")] private static extern int GetSystemMetricsForDpi(int nIndex, uint dpi);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
 
     private const int SW_MAXIMIZE = 3, SW_RESTORE = 9;
     private const int SM_CXSIZEFRAME = 32, SM_CYSIZEFRAME = 33, SM_CXPADDEDBORDER = 92;
+
+    // A frame metric for the DPI of the monitor the window is on: the maximized overhang differs by
+    // monitor, not by process DPI, so a window maximized on a differently-scaled second monitor needs
+    // that monitor's metric. Falls back to the process-DPI metric on Windows too old for the export.
+    private static int FrameMetric(IntPtr hWnd, int index)
+    {
+        try
+        {
+            uint dpi = GetDpiForWindow(hWnd);
+            if (dpi != 0) return GetSystemMetricsForDpi(index, dpi);
+        }
+        catch (EntryPointNotFoundException) { }
+        return GetSystemMetrics(index);
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
@@ -206,9 +222,9 @@ internal static class WindowChrome
             // rows vanish and the bottom runs under the taskbar. Inset by the frame it assumed.
             if (IsZoomed(hWnd))
             {
-                int pad = GetSystemMetrics(SM_CXPADDEDBORDER);
-                int cx = GetSystemMetrics(SM_CXSIZEFRAME) + pad;
-                int cy = GetSystemMetrics(SM_CYSIZEFRAME) + pad;
+                int pad = FrameMetric(hWnd, SM_CXPADDEDBORDER);
+                int cx = FrameMetric(hWnd, SM_CXSIZEFRAME) + pad;
+                int cy = FrameMetric(hWnd, SM_CYSIZEFRAME) + pad;
 
                 var r = Marshal.PtrToStructure<RECT>(lParam); // first field of NCCALCSIZE_PARAMS
                 r.Left += cx; r.Top += cy; r.Right -= cx; r.Bottom -= cy;
