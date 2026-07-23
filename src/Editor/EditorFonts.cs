@@ -45,7 +45,8 @@ public static class EditorFonts
         _claimed.Add(fileBaseName);
         if (_all.Exists(o => o.Name == displayName)) return;
         var font = TryLoad(gd, Path.Combine(FontDir, fileBaseName));
-        if (font == null || !FitsCell(font)) return;
+        if (font == null) return;
+        if (!FitsCell(font)) { font.Dispose(); return; }
         _all.Add(new Option(displayName, font));
     }
 
@@ -89,9 +90,11 @@ public static class EditorFonts
             string baseName = Path.GetFileNameWithoutExtension(path);
             if (_claimed.Contains(baseName)) continue;      // engine faces + app-registered ones
             var font = TryLoad(gd, Path.Combine(dir, baseName));
-            if (font == null || !FitsCell(font)) continue;  // must share the cell or it will not line up
+            if (font == null) continue;
+            if (!FitsCell(font)) { font.Dispose(); continue; } // must share the cell or it will not line up
             string name = Pretty(baseName);
-            if (!_all.Exists(o => o.Name == name)) _all.Add(new Option(name, font));
+            if (_all.Exists(o => o.Name == name)) { font.Dispose(); continue; }
+            _all.Add(new Option(name, font));
         }
     }
 

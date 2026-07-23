@@ -439,7 +439,9 @@ public class TextArea : Widget
         if (!coalesce) Buf.BreakUndoCoalescing();
         var at = _caret;
         Buf.Insert(at, s);
-        Collapse(TextBuffer.Advance(at, s));
+        // Advance over the NORMALIZED text: Buf.Insert turns CRLF and lone CR into LF and splits on
+        // it, so advancing over the raw string miscounts lines for a lone CR (old-Mac clipboard text).
+        Collapse(TextBuffer.Advance(at, TextBuffer.Normalize(s)));
         EnsureVisible();
     }
 

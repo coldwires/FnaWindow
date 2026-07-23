@@ -216,7 +216,8 @@ public sealed class TextBuffer
     private static (Position, Position) Order(Position a, Position b)
         => a.CompareTo(b) <= 0 ? (a, b) : (b, a);
 
-    private static string Normalize(string s) => s.Replace("\r\n", "\n").Replace('\r', '\n');
+    /// <summary>Converts CRLF and lone CR to LF, the buffer's only line separator.</summary>
+    public static string Normalize(string s) => s.Replace("\r\n", "\n").Replace('\r', '\n');
 
     // Word-class for coalescing: letters/digits/underscore group together; each run of
     // the same "other" char groups; whitespace (non-newline) groups. Newlines never coalesce.

@@ -30,6 +30,11 @@ public sealed partial class BitmapFont
         CellWidth = cellWidth;
     }
 
+    /// <summary>Releases the atlas texture. Call only on a font being discarded - a scanned atlas that
+    /// did not fit the editor cell. The long-lived fonts (editor, UI, chrome) are kept for the process
+    /// lifetime on purpose and are never disposed.</summary>
+    public void Dispose() => _atlas.Dispose();
+
     /// <summary>
     /// Loads a font from "<paramref name="basePathNoExt"/>.png" + ".json".
     /// </summary>
