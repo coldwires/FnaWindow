@@ -454,9 +454,12 @@ public class TextArea : Widget
     protected void IndentLines()
     {
         var (first, last) = SelectedLineRange();
-        Buf.BreakUndoCoalescing();
+        // Replace the whole (contiguous) line range in one edit so the indent is a single undo step.
+        // A per-line Insert loop pushes one undo op per line, so one Ctrl+Z un-indents just one line.
         string pad = new string(' ', Tabs.Width);
-        for (int ln = first; ln <= last; ln++) Buf.Insert(new Position(ln, 0), pad);
+        var lines = new string[last - first + 1];
+        for (int ln = first; ln <= last; ln++) lines[ln - first] = pad + Buf.Line(ln);
+        Buf.Replace(new Position(first, 0), new Position(last, Buf.LineLength(last)), string.Join("\n", lines));
         _anchor = new Position(first, 0);
         _caret = new Position(last, Buf.LineLength(last));
         ResetBlink(); NotifyCaret(); EnsureVisible();
@@ -465,15 +468,20 @@ public class TextArea : Widget
     protected void OutdentLines()
     {
         var (first, last) = SelectedLineRange();
-        Buf.BreakUndoCoalescing();
+        var lines = new string[last - first + 1];
+        bool changed = false;
         for (int ln = first; ln <= last; ln++)
         {
             string line = Buf.Line(ln);
             int remove = 0;
             while (remove < Tabs.Width && remove < line.Length && line[remove] == ' ') remove++;
             if (remove == 0 && line.Length > 0 && line[0] == '\t') remove = 1; // a leading hard tab
-            if (remove > 0) Buf.Delete(new Position(ln, 0), new Position(ln, remove));
+            if (remove > 0) changed = true;
+            lines[ln - first] = line.Substring(remove);
         }
+        // One Replace for a single undo step (see IndentLines); skip if nothing was indented.
+        if (changed)
+            Buf.Replace(new Position(first, 0), new Position(last, Buf.LineLength(last)), string.Join("\n", lines));
         if (HasSel) { _anchor = new Position(first, 0); _caret = new Position(last, Buf.LineLength(last)); }
         else Collapse(new Position(first, Math.Min(_caret.Col, Buf.LineLength(first))));
         ResetBlink(); NotifyCaret(); EnsureVisible();
@@ -636,7 +644,11 @@ public class TextArea : Widget
         _verticalMove = true;
         int ri = Math.Clamp(RowIndexOf(_caret) + dRows, 0, _rows.Count - 1);
         var row = _rows[ri];
-        int col = Math.Min(row.Start + _goalCol, row.End);
+        // On a non-final visual row, End is the wrap point, which RowIndexOf assigns to the NEXT row -
+        // landing the caret there would put it a row below the one this move chose. Cap at End-1 so it
+        // stays on ri; the last row of a line keeps End (the caret may sit at end-of-line).
+        int maxCol = (ri == _firstRow[row.Line + 1] - 1) ? row.End : row.End - 1;
+        int col = Math.Min(row.Start + _goalCol, maxCol);
         Move(new Position(row.Line, col), extend);
         _verticalMove = false;
     }
