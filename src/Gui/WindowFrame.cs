@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 
 namespace FnaWindow;
@@ -62,7 +63,7 @@ public sealed class WindowFrame : Widget
 
     public override void Layout()
     {
-        int x = Bounds.X + FrameB, w = Bounds.Width - 2 * FrameB, y = Bounds.Y + FrameB;
+        int x = Bounds.X + FrameB, w = Math.Max(0, Bounds.Width - 2 * FrameB), y = Bounds.Y + FrameB;
 
         Title.Bounds = new Rectangle(x, y, w, Theme.TitleBarHeight);
         y += Theme.TitleBarHeight;
@@ -83,7 +84,7 @@ public sealed class WindowFrame : Widget
             Status.Bounds = new Rectangle(x, bottom, w, Theme.StatusBarHeight);
         }
 
-        if (Content != null) Content.Bounds = new Rectangle(x, y, w, bottom - y);
+        if (Content != null) Content.Bounds = new Rectangle(x, y, w, Math.Max(0, bottom - y));
 
         base.Layout();
         _dialog?.Layout(); // keep a modal centered across resizes

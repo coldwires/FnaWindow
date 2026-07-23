@@ -169,8 +169,8 @@ public class ListBox : Widget
 
     public override void Update(InputState input, GameTime t)
     {
-        // The scrollbar is a child and must still run, so this gate goes here rather than around
-        // base.Update: a popup blocks interaction with the list, not the existence of its parts.
+        // A popup that owns input blocks the whole list, scrollbar included - nothing here should
+        // act on the mouse while another widget holds it, and no idle animation is lost by returning.
         if (InputBlocked) return;
         if (!Enabled) return;
 
