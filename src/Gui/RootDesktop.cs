@@ -44,8 +44,10 @@ public sealed class RootDesktop : Widget
         Popup.BeginFrame(); // a popup closed last frame stops swallowing input now
         base.Update(input, t);
 
-        // Route typed characters + keys to the focused widget, unless a popup owns input.
-        if (!Popup.IsOpen && Focused is { WantsKeyboard: true })
+        // Route typed characters + keys to the focused widget, unless a popup owns input. Gate on
+        // BlocksInput, not IsOpen: a popup that closed mid-frame (Enter/Esc on a menu item) keeps the
+        // key for the rest of this frame, so choosing a menu item does not also type into the editor.
+        if (!Popup.BlocksInput && Focused is { WantsKeyboard: true })
         {
             foreach (char c in input.TypedChars) Focused.OnChar(c);
             Focused.OnKey(input);

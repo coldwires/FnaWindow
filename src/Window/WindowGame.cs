@@ -249,8 +249,15 @@ public class WindowGame : Game
         if (Root.CursorCapture is { } cap)
             key = cap.CursorKey(Input.Mouse) ?? key;
         else if (!Root.Popup.IsOpen)
-            for (var w = Root.HitTest(Input.Mouse); w != null; w = w.Parent)
-                if (w.CursorKey(Input.Mouse) is { } k) { key = k; break; }
+        {
+            // A resize edge/corner is the strongest affordance, so its size cursor wins over any
+            // widget's: hovering the border hints the drag WindowHitTest already allows. Maximized
+            // returns no edge codes, so no size cursor shows there (nothing to resize).
+            if (EdgeCursor(WindowHitTest(Input.Mouse.X, Input.Mouse.Y)) is { } edge) key = edge;
+            else
+                for (var w = Root.HitTest(Input.Mouse); w != null; w = w.Parent)
+                    if (w.CursorKey(Input.Mouse) is { } k) { key = k; break; }
+        }
         Cursors.Set(key);
     }
 
@@ -501,20 +508,35 @@ public class WindowGame : Game
     /// <summary>Maps a client point to a non-client hit code so Windows drags/resizes natively.</summary>
     private int WindowHitTest(int cx, int cy)
     {
-        if (_maximized) return WindowChrome.HTCLIENT;
-        const int E = 4; // resize border
-        var vp = GraphicsDevice.Viewport;
-        int w = vp.Width, h = vp.Height;
-        bool l = cx < E, r = cx >= w - E, tp = cy < E, bt = cy >= h - E;
-        if (tp && l) return WindowChrome.HTTOPLEFT;
-        if (tp && r) return WindowChrome.HTTOPRIGHT;
-        if (bt && l) return WindowChrome.HTBOTTOMLEFT;
-        if (bt && r) return WindowChrome.HTBOTTOMRIGHT;
-        if (l) return WindowChrome.HTLEFT;
-        if (r) return WindowChrome.HTRIGHT;
-        if (tp) return WindowChrome.HTTOP;
-        if (bt) return WindowChrome.HTBOTTOM;
+        // Maximized has no resize edges (Windows overhangs the frame off every side), but the caption
+        // must still report HTCAPTION so a drag-down or double-click restores the window natively,
+        // mirroring the maximize gestures that work while restored.
+        if (!_maximized)
+        {
+            const int E = 4; // resize border
+            var vp = GraphicsDevice.Viewport;
+            int w = vp.Width, h = vp.Height;
+            bool l = cx < E, r = cx >= w - E, tp = cy < E, bt = cy >= h - E;
+            if (tp && l) return WindowChrome.HTTOPLEFT;
+            if (tp && r) return WindowChrome.HTTOPRIGHT;
+            if (bt && l) return WindowChrome.HTBOTTOMLEFT;
+            if (bt && r) return WindowChrome.HTBOTTOMRIGHT;
+            if (l) return WindowChrome.HTLEFT;
+            if (r) return WindowChrome.HTRIGHT;
+            if (tp) return WindowChrome.HTTOP;
+            if (bt) return WindowChrome.HTBOTTOM;
+        }
         if (Caption.IsOnDragArea(new Point(cx, cy))) return WindowChrome.HTCAPTION;
         return WindowChrome.HTCLIENT;
     }
+
+    // The resize cursor key for a hit-test code, or null for a non-edge (caption/client) code.
+    private static string? EdgeCursor(int ht) => ht switch
+    {
+        WindowChrome.HTLEFT or WindowChrome.HTRIGHT => "sizewe",
+        WindowChrome.HTTOP or WindowChrome.HTBOTTOM => "sizens",
+        WindowChrome.HTTOPLEFT or WindowChrome.HTBOTTOMRIGHT => "sizenwse",
+        WindowChrome.HTTOPRIGHT or WindowChrome.HTBOTTOMLEFT => "sizenesw",
+        _ => null,
+    };
 }

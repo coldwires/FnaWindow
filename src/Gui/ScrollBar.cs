@@ -51,6 +51,9 @@ public sealed class ScrollBar : Widget
     private int ThumbLen()
     {
         if (!Active) return TrackLen;
+        // A track shorter than the 8px minimum thumb cannot clamp to [8, TrackLen] (min > max throws);
+        // a window shrunk very small reaches this. Fill the track instead of asserting a minimum.
+        if (TrackLen < 8) return Math.Max(0, TrackLen);
         int len = (int)((long)TrackLen * ViewSize / ContentSize);
         return Math.Clamp(len, 8, TrackLen);
     }

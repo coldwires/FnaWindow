@@ -106,8 +106,10 @@ public sealed class MenuBar : Widget
             if (input.LeftPressed && _hovered >= 0 && (popupLayer == null || !popupLayer.IsOpen))
                 OpenMenu(_hovered);
 
-            // Alt+mnemonic opens a menu.
-            if (input.Alt)
+            // Alt+mnemonic opens a menu - but not over an open popup (a modal dialog owns the layer;
+            // opening a menu here would overwrite Popup.Current and orphan the dialog), matching the
+            // click-to-open guard above.
+            if (input.Alt && (popupLayer == null || !popupLayer.IsOpen))
             {
                 for (int i = 0; i < Menus.Count; i++)
                 {
