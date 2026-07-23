@@ -52,15 +52,33 @@ public sealed class InputState
         }
     }
 
-    public void Update(GameTime gt)
+    public void Update(GameTime gt, bool windowActive)
     {
         double dt = gt.ElapsedGameTime.TotalMilliseconds;
         _totalMs += dt;
 
         _prevKb = _kb;
-        _kb = Keyboard.GetState();
         _prevMouse = _mouse;
-        _mouse = Microsoft.Xna.Framework.Input.Mouse.GetState();
+
+        if (windowActive)
+        {
+            _kb = Keyboard.GetState();
+            _mouse = Microsoft.Xna.Framework.Input.Mouse.GetState();
+        }
+        else
+        {
+            // Not the focused window: drop live input so a click meant for a window IN FRONT of us is
+            // not taken by our widgets. SDL reports mouse buttons globally, so without this a click on
+            // another window lands on whatever of ours sits under the cursor. Present an all-released
+            // snapshot with the pointer frozen, and set prev == current so regaining focus cannot
+            // synthesize a stray press or release edge.
+            _kb = default;
+            _mouse = new MouseState(_prevMouse.X, _prevMouse.Y, _prevMouse.ScrollWheelValue,
+                ButtonState.Released, ButtonState.Released, ButtonState.Released,
+                ButtonState.Released, ButtonState.Released);
+            _prevKb = _kb;
+            _prevMouse = _mouse;
+        }
 
         PrevMouse = new Point(_prevMouse.X, _prevMouse.Y);
         Mouse = new Point(_mouse.X, _mouse.Y);

@@ -405,7 +405,7 @@ public class WindowGame : Game
     protected override void Update(GameTime gameTime)
     {
         if (MainThread.Drain()) RequestRedraw();   // apply background-thread work on the UI thread
-        Input.Update(gameTime);
+        Input.Update(gameTime, IsActive);          // IsActive false -> ignore input for an unfocused window
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
