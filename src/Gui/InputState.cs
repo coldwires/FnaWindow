@@ -161,6 +161,10 @@ public sealed class InputState
     public bool LeftReleased => _mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed;
     public bool RightPressed => _mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released;
 
+    public bool MiddleDown => _mouse.MiddleButton == ButtonState.Pressed;
+    public bool MiddlePressed => _mouse.MiddleButton == ButtonState.Pressed && _prevMouse.MiddleButton == ButtonState.Released;
+    public bool MiddleReleased => _mouse.MiddleButton == ButtonState.Released && _prevMouse.MiddleButton == ButtonState.Pressed;
+
     /// <summary>True if anything happened this frame (mouse moved/held, wheel, key, or text).
     /// Used to keep the render loop awake; when false and nothing requests a redraw, drawing idles.</summary>
     public bool AnyActivity =>
