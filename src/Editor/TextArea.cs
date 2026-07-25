@@ -256,8 +256,9 @@ public class TextArea : Widget
 
     // -- Layout ------------------------------------------------------------
 
-    /// <summary>I-beam over the text region (not the scrollbars), else defer to parent/default.</summary>
-    public override string? CursorKey(Point p) => TextRect.Contains(p) ? "ibeam" : null;
+    /// <summary>I-beam over the text region (not the scrollbars), else defer to parent/default.
+    /// Mid-pan the four-arrow move cursor takes over, held through the drag via CursorCapture.</summary>
+    public override string? CursorKey(Point p) => Panning ? "size" : TextRect.Contains(p) ? "ibeam" : null;
 
     public override void Layout()
     {
@@ -305,6 +306,59 @@ public class TextArea : Widget
         if (!MouseBlocked) HandleMouse(input);
     }
 
+    // -- Middle mouse: drag pans, a still click is the subclass hook ---------
+    // Grab-the-page panning: content follows the hand, one cell per cell of mouse travel. The
+    // pan only engages once the mouse has moved a few pixels, so a plain middle CLICK (press and
+    // release in place) stays distinct and fires OnMiddleClick instead - apps bind "focus" style
+    // actions to it. While panning, CursorCapture holds the "size" cursor even off the widget.
+
+    /// <summary>Fired by a middle click that never turned into a pan, with the text position
+    /// under the mouse. Null = middle clicks do nothing.</summary>
+    public Action<Position>? OnMiddleClick;
+
+    private bool _panning, _panMoved;
+    private Point _panAnchor;
+    private int _panLine, _panCol;
+
+    /// <summary>True while a middle-drag is actually panning (a still press does not count).</summary>
+    protected bool Panning => _panning && _panMoved;
+
+    private void HandleMiddleMouse(InputState input, Point m, bool inText)
+    {
+        if (input.MiddlePressed && inText && !VBar.Bounds.Contains(m) && !(HBar.Visible && HBar.Bounds.Contains(m)))
+        {
+            _panning = true;
+            _panMoved = false;
+            _panAnchor = m;
+            _panLine = ScrollLine;
+            _panCol = ScrollCol;
+        }
+        if (!_panning) return;
+
+        if (input.MiddleDown)
+        {
+            int dx = m.X - _panAnchor.X, dy = m.Y - _panAnchor.Y;
+            if (!_panMoved && dx * dx + dy * dy > 9)     // 3px: a click's tremble never pans
+            {
+                _panMoved = true;
+                if (Root() is { } rt) rt.CursorCapture = this;
+            }
+            if (_panMoved)
+            {
+                ScrollLine = Math.Clamp(_panLine - dy / CellH, 0, VBar.MaxValue);
+                if (HBar.Visible) ScrollCol = Math.Clamp(_panCol - dx / CellW, 0, HBar.MaxValue);
+                Root()?.RequestRedraw();
+            }
+        }
+        else // released (or focus lost with the button up): end the pan
+        {
+            bool wasClick = !_panMoved && TextRect.Contains(m);
+            _panning = _panMoved = false;
+            if (Root() is { } rt && rt.CursorCapture == this) rt.CursorCapture = null;
+            if (wasClick) OnMiddleClick?.Invoke(PosFromMouse(m));
+        }
+    }
+
     private void SyncScrollbars()
     {
         VBar.ContentSize = _rows.Count;   // rows, not lines: one wrapped line can be several
@@ -346,6 +400,8 @@ public class TextArea : Widget
             NotifyCaret();
         }
         if (input.LeftReleased) _selecting = false;
+
+        HandleMiddleMouse(input, m, inText);
 
         // The wheel moves the caret one step per notch (there was no wheel in 3.1; a notch maps to a
         // caret step and EnsureVisible follows). Plain wheel = up/down a line with the goal column
