@@ -271,13 +271,20 @@ public class TextArea : Widget
         HBar.Visible = !_wordWrap;
         int bottomStrip = HBar.Visible ? t : 0;
 
-        VBar.Bounds = new Rectangle(inner.Right - t, inner.Y, t, inner.Height - bottomStrip);
+        // VBar.Visible is the caller's to set (a small embedded area - a one-line field, a couple
+        // of rows - has no use for it), and it is honoured the same way HBar's is: the strip goes
+        // back to the text rather than being left blank.
+        int rightStrip = VBar.Visible ? t : 0;
+
+        VBar.Bounds = VBar.Visible
+            ? new Rectangle(inner.Right - t, inner.Y, t, inner.Height - bottomStrip)
+            : Rectangle.Empty;
         HBar.Bounds = HBar.Visible
-            ? new Rectangle(inner.X, inner.Bottom - t, inner.Width - t, t)
+            ? new Rectangle(inner.X, inner.Bottom - t, inner.Width - rightStrip, t)
             : Rectangle.Empty;
         VBar.Layout(); HBar.Layout();
 
-        TextRect = new Rectangle(inner.X, inner.Y, inner.Width - t, inner.Height - bottomStrip);
+        TextRect = new Rectangle(inner.X, inner.Y, inner.Width - rightStrip, inner.Height - bottomStrip);
         OriginX = TextRect.X + Theme.EditorPaddingLeft;
         OriginY = TextRect.Y + Theme.EditorPaddingTop;
         VisLines = Math.Max(1, (TextRect.Bottom - OriginY) / CellH);
@@ -295,7 +302,7 @@ public class TextArea : Widget
         SyncScrollbars();
         if (!MouseBlocked)
         {
-            VBar.Update(input, t);
+            if (VBar.Visible) VBar.Update(input, t);
             if (HBar.Visible) HBar.Update(input, t);
         }
 
@@ -893,7 +900,7 @@ public class TextArea : Widget
             }
         }
 
-        VBar.Draw(r);
+        if (VBar.Visible) VBar.Draw(r);
         if (HBar.Visible)
         {
             HBar.Draw(r);
