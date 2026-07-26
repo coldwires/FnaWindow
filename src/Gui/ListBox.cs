@@ -123,7 +123,10 @@ public class ListBox : Widget
     public void Select(int index)
     {
         int n = RowCount;
-        if (n == 0) { SetSelected(-1, notify: true); return; }
+        // A negative index clears, as documented. Clamping it to 0 instead would select the first
+        // row and raise SelectionChanged for it, so "clear the selection" would silently mean
+        // "activate row 0" for any caller repopulating a list.
+        if (index < 0 || n == 0) { SetSelected(-1, notify: true); return; }
         SetSelected(Math.Clamp(index, 0, n - 1), notify: true);
         ScrollIntoView(Selected);
     }
