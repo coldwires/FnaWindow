@@ -232,6 +232,12 @@ public class WindowGame : Game
             }
             catch { /* skip a bad cursor; the OS one still applies */ }
         }
+
+        // "hand" comes from the OS rather than from art. 3.1 had no hand pointer, so there is no
+        // period-correct one to draw, and a link is a modern affordance anyway - the cursor people
+        // already recognise for it is their own system's.
+        Cursors.DefineSystem("hand", Cursors.SystemPointer);
+
         if (any) CursorDefault = "arrow";
     }
 

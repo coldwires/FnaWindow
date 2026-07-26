@@ -20,6 +20,7 @@ public static class Cursors
 
     [DllImport(SDL)] private static extern IntPtr SDL_CreateSurfaceFrom(int w, int h, uint format, IntPtr pixels, int pitch);
     [DllImport(SDL)] private static extern IntPtr SDL_CreateColorCursor(IntPtr surface, int hotX, int hotY);
+    [DllImport(SDL)] private static extern IntPtr SDL_CreateSystemCursor(int id);
     [DllImport(SDL)] private static extern void SDL_DestroySurface(IntPtr surface);
     [DllImport(SDL)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SDL_SetCursor(IntPtr cursor);
 
@@ -53,6 +54,22 @@ public static class Cursors
         }
         finally { Marshal.FreeHGlobal(buf); } // safe: the cursor owns its own copy now
     }
+
+    /// <summary>
+    /// Register a named cursor from the OS's own set (SDL_SystemCursor). Use this where the point
+    /// is to match what the rest of the desktop does rather than to match the app's own art: the
+    /// link hand is the case, since a person recognises their own system's hand instantly and a
+    /// hand-drawn one just looks slightly wrong.
+    /// </summary>
+    public static void DefineSystem(string key, int systemCursorId)
+    {
+        if (_cursors.ContainsKey(key)) return;
+        IntPtr cursor = SDL_CreateSystemCursor(systemCursorId);
+        if (cursor != IntPtr.Zero) _cursors[key] = cursor;
+    }
+
+    /// <summary>SDL_SYSTEM_CURSOR_POINTER - the OS hand used for links.</summary>
+    public const int SystemPointer = 11;
 
     /// <summary>Set the cursor to a registered key. No-op if unknown or already current.</summary>
     public static void Set(string key)
