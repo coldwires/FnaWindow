@@ -52,6 +52,11 @@ public class TextArea : Widget
     /// <summary>Faint band across the caret's line when there is no selection.</summary>
     public bool HighlightCurrentLine = true;
 
+    /// <summary>Draw the sunken well behind the text. Off when the owner has already drawn one - a
+    /// <see cref="TitledPanel"/> in its welled style, say - so the two do not stack into a double
+    /// border. Mirrors <see cref="ListBox.DrawWell"/>, which exists for the same reason.</summary>
+    public bool DrawWell = true;
+
     /// <summary>
     /// The USER cannot edit: typing, Enter, Tab, Backspace, Delete, Cut, Paste, Undo and Redo all do
     /// nothing, and no caret is drawn. Everything that does not change the text still works -
@@ -829,7 +834,8 @@ public class TextArea : Widget
 
     public override void Draw(Win31Renderer r)
     {
-        r.DrawPanel(Well, BevelStyle.SunkenThick, Theme.WindowBg);
+        if (DrawWell) r.DrawPanel(Well, BevelStyle.SunkenThick, Theme.WindowBg);
+        else r.Fill(Well, Theme.WindowBg);
 
         var (selA, selB) = Sel();
         bool hasSel = HasSel;
