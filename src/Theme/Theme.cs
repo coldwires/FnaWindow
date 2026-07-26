@@ -38,6 +38,11 @@ public static class Theme
     /// instead of needing its own entry in every palette.</summary>
     public static Color EditorCurrentLine => Mix(WindowBg, TitleActive, 0.10f);
 
+    /// <summary>The shade behind the row under the pointer in a list that opted into
+    /// <see cref="ListBox.HoverHighlight"/>. Derived the same way, and a touch stronger than the
+    /// caret band so the two do not read as the same thing in one window.</summary>
+    public static Color HoverRow => Mix(WindowBg, TitleActive, 0.16f);
+
     private static Color Mix(Color a, Color b, float t) => new(
         (int)(a.R + (b.R - a.R) * t),
         (int)(a.G + (b.G - a.G) * t),

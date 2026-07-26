@@ -37,6 +37,17 @@ public class ListBox : Widget
     /// </summary>
     public bool HandleKeys = true;
 
+    /// <summary>
+    /// Shade the row under the pointer. OFF by default and deliberately so: Windows 3.1 list boxes
+    /// had no hover state, so turning it on everywhere would break the period look. Turn it on for
+    /// a list whose rows are navigation targets rather than a selection to be made - there, the
+    /// shade is the affordance that says the row is clickable.
+    /// </summary>
+    public bool HoverHighlight;
+
+    /// <summary>Row under the pointer, or -1. Only tracked while <see cref="HoverHighlight"/> is on.</summary>
+    public int Hovered { get; private set; } = -1;
+
     /// <summary>Raised when the selection changes, by any means.</summary>
     public Action<int>? SelectionChanged;
 
@@ -155,12 +166,26 @@ public class ListBox : Widget
         VBar.Value = _scroll;
     }
 
+    /// <summary>The pointer moving is not an input event, so a change here has to wake the idle
+    /// redraw throttle itself or the shade appears only on the next unrelated repaint.</summary>
+    private void SetHovered(int value)
+    {
+        if (Hovered == value) return;
+        Hovered = value;
+        Root()?.RequestRedraw();
+    }
+
     private void SetSelected(int value, bool notify)
     {
         if (Selected == value) return;
         Selected = value;
         if (notify) SelectionChanged?.Invoke(value);
     }
+
+    /// <summary>A hover-highlighted list is a set of navigation targets rather than a selection to
+    /// be made, so its rows take the link cursor. An ordinary list keeps the arrow.</summary>
+    public override string? CursorKey(Point p) =>
+        HoverHighlight && RowAtPoint(p) >= 0 ? "hand" : base.CursorKey(p);
 
     /// <summary>The row index at a point, or -1 if the point is outside the rows or past the last one.</summary>
     public int RowAtPoint(Point p)
@@ -174,13 +199,16 @@ public class ListBox : Widget
     {
         // A popup that owns input blocks the whole list, scrollbar included - nothing here should
         // act on the mouse while another widget holds it, and no idle animation is lost by returning.
-        if (InputBlocked) return;
-        if (!Enabled) return;
+        // The hover has to be dropped on the way out, or it stays lit under whatever covered it.
+        if (InputBlocked) { SetHovered(-1); return; }
+        if (!Enabled) { SetHovered(-1); return; }
 
         SyncScrollBar();
         base.Update(input, t);
 
         var m = input.Mouse;
+
+        if (HoverHighlight) SetHovered(Bounds.Contains(m) ? RowAtPoint(m) : -1);
 
         if (input.WheelDelta != 0 && Bounds.Contains(m))
             ScrollBy(-input.WheelDelta * 3);
@@ -223,6 +251,8 @@ public class ListBox : Widget
             var rect = new Rectangle(RowsRect.X, RowsRect.Y + i * RowHeight, RowsRect.Width, RowHeight);
             bool selected = idx == Selected;
             if (selected) r.Fill(rect.X, rect.Y, rect.Width, rect.Height, Theme.TitleActive);
+            else if (HoverHighlight && idx == Hovered)
+                r.Fill(rect.X, rect.Y, rect.Width, rect.Height, Theme.HoverRow);
             DrawRow(r, idx, rect, selected);
         }
 
