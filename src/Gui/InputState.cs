@@ -159,7 +159,9 @@ public sealed class InputState
     public bool LeftDown => _mouse.LeftButton == ButtonState.Pressed;
     public bool LeftPressed => _mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released;
     public bool LeftReleased => _mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed;
+    public bool RightDown => _mouse.RightButton == ButtonState.Pressed;
     public bool RightPressed => _mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released;
+    public bool RightReleased => _mouse.RightButton == ButtonState.Released && _prevMouse.RightButton == ButtonState.Pressed;
 
     public bool MiddleDown => _mouse.MiddleButton == ButtonState.Pressed;
     public bool MiddlePressed => _mouse.MiddleButton == ButtonState.Pressed && _prevMouse.MiddleButton == ButtonState.Released;
