@@ -52,10 +52,7 @@ public sealed class FormDialog : Widget
     private sealed class Field
     {
         public string Label = "";
-        public string Text = "";
-        public int Caret;
-        public int MaxLength = 128;
-        public Rectangle Rect;
+        public TextField Box = new();
     }
 
     private readonly string _title;
@@ -63,8 +60,6 @@ public sealed class FormDialog : Widget
     private readonly List<CheckBox> _checks = new();
 
     private int _focus;              // index of the focused field
-    private double _blinkMs;
-    private bool _caretOn = true;
 
     private Rectangle _titleRect;
     private readonly PushButton _ok = new("OK");
@@ -84,7 +79,11 @@ public sealed class FormDialog : Widget
 
     public FormDialog AddField(string label, string initial = "", int maxLength = 128)
     {
-        _fields.Add(new Field { Label = label, Text = initial ?? "", Caret = (initial ?? "").Length, MaxLength = maxLength });
+        _fields.Add(new Field
+        {
+            Label = label,
+            Box = new TextField(initial ?? "") { MaxLength = maxLength, Focused = _fields.Count == 0 },
+        });
         return this;
     }
 
@@ -95,13 +94,13 @@ public sealed class FormDialog : Widget
     }
 
     /// <summary>Reads a field back before OK - for a live search that updates as you type.</summary>
-    public string Text(int i) => i >= 0 && i < _fields.Count ? _fields[i].Text : "";
+    public string Text(int i) => i >= 0 && i < _fields.Count ? _fields[i].Box.Text : "";
     public bool Checked(int i) => i >= 0 && i < _checks.Count && _checks[i].Checked;
 
     private FormResult Result()
     {
         var f = new string[_fields.Count];
-        for (int i = 0; i < f.Length; i++) f[i] = _fields[i].Text;
+        for (int i = 0; i < f.Length; i++) f[i] = _fields[i].Box.Text;
         var c = new bool[_checks.Count];
         for (int i = 0; i < c.Length; i++) c[i] = _checks[i].Checked;
         return new FormResult(f, c);
@@ -139,7 +138,7 @@ public sealed class FormDialog : Widget
         int ry = y + contentTop;
         foreach (var f in _fields)
         {
-            f.Rect = new Rectangle(x + 14, ry + lineH, W - 28, FieldH);
+            f.Box.Bounds = new Rectangle(x + 14, ry + lineH, W - 28, FieldH);
             ry += lineH + FieldH + RowGap;
         }
         foreach (var c in _checks)
@@ -160,34 +159,21 @@ public sealed class FormDialog : Widget
     {
         Root()?.RequestRedraw(); // keep the caret blinking while the modal is open (idle throttle)
 
-        _blinkMs += t.ElapsedGameTime.TotalMilliseconds;
-        if (_blinkMs >= Theme.CaretBlinkMs) { _blinkMs = 0; _caretOn = !_caretOn; }
-
-        // Click a field to focus it.
+        // Click a field to focus it. The field itself also sets Focused on a click inside it, but
+        // this dialog owns which ONE is focused, so it is decided here and pushed down.
         if (input.LeftPressed)
             for (int i = 0; i < _fields.Count; i++)
-                if (_fields[i].Rect.Contains(input.Mouse)) { _focus = i; Blink(); }
+                if (_fields[i].Box.Bounds.Contains(input.Mouse)) _focus = i;
 
         // Tab cycles fields - the reason this dialog exists is having more than one.
         if (_fields.Count > 0 && input.Pressed(Keys.Tab))
-        {
             _focus = (_focus + (input.Shift ? _fields.Count - 1 : 1)) % _fields.Count;
-            Blink();
-        }
 
-        if (_fields.Count > 0)
+        _focus = Math.Clamp(_focus, 0, Math.Max(0, _fields.Count - 1));
+        for (int i = 0; i < _fields.Count; i++)
         {
-            var f = _fields[Math.Clamp(_focus, 0, _fields.Count - 1)];
-            foreach (char c in input.TypedChars)
-                if (!char.IsControl(c) && f.Text.Length < f.MaxLength)
-                { f.Text = f.Text.Insert(f.Caret, c.ToString()); f.Caret++; Blink(); }
-
-            if (input.Pressed(Keys.Back) && f.Caret > 0) { f.Text = f.Text.Remove(f.Caret - 1, 1); f.Caret--; Blink(); }
-            else if (input.Pressed(Keys.Delete) && f.Caret < f.Text.Length) { f.Text = f.Text.Remove(f.Caret, 1); Blink(); }
-            else if (input.Pressed(Keys.Left) && f.Caret > 0) { f.Caret--; Blink(); }
-            else if (input.Pressed(Keys.Right) && f.Caret < f.Text.Length) { f.Caret++; Blink(); }
-            else if (input.Pressed(Keys.Home)) { f.Caret = 0; Blink(); }
-            else if (input.Pressed(Keys.End)) { f.Caret = f.Text.Length; Blink(); }
+            _fields[i].Box.Focused = i == _focus;
+            _fields[i].Box.Update(input, t);
         }
 
         foreach (var c in _checks) c.Update(input);
@@ -203,8 +189,6 @@ public sealed class FormDialog : Widget
         if (_cancel.Update(input)) { OnCancel?.Invoke(); return; }
     }
 
-    private void Blink() { _blinkMs = 0; _caretOn = true; }
-
     public override void Draw(Win31Renderer r)
     {
         r.DrawPanel(Bounds, BevelStyle.RaisedThick, Theme.Face);
@@ -213,21 +197,10 @@ public sealed class FormDialog : Widget
         r.DrawText(r.UiBoldFont, _title, _titleRect.X + 5,
             _titleRect.Y + (_titleRect.Height - r.UiBoldFont.LineHeight) / 2, Theme.TitleText);
 
-        for (int i = 0; i < _fields.Count; i++)
+        foreach (var f in _fields)
         {
-            var f = _fields[i];
-            r.DrawText(r.UiFont, f.Label, f.Rect.X, f.Rect.Y - r.UiFont.LineHeight - 2, Theme.Text);
-            r.DrawPanel(f.Rect, BevelStyle.SunkenThick, Theme.WindowBg);
-
-            int tx = f.Rect.X + 4;
-            int ty = f.Rect.Y + (f.Rect.Height - r.UiFont.LineHeight) / 2;
-            r.DrawText(r.UiFont, f.Text, tx, ty, Theme.Text);
-
-            if (i == _focus && _caretOn)
-            {
-                int cx = tx + r.UiFont.MeasureWidth(f.Text.Substring(0, f.Caret));
-                r.Fill(cx, ty, 1, r.UiFont.LineHeight, Theme.Text);
-            }
+            r.DrawText(r.UiFont, f.Label, f.Box.Bounds.X, f.Box.Bounds.Y - r.UiFont.LineHeight - 2, Theme.Text);
+            f.Box.Draw(r);
         }
 
         foreach (var c in _checks) c.Draw(r);

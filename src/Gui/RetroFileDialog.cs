@@ -27,14 +27,13 @@ public sealed class RetroFileDialog : Widget
     private readonly string? _defaultExt;  // appended to a save name with no extension; null = none
 
     private string _dir;
-    private string _fileName;
-    private int _caret;
+    private readonly TextField _name = new() { MaxLength = 260 };
 
     private readonly List<FsEntry> _entries = new();
     private readonly ListBox _list = new() { HandleKeys = false };
     private readonly DirectoryLoader _loader = new();
 
-    private Rectangle _fieldRect, _titleRect;
+    private Rectangle _titleRect;
 
     // Drag by the caption, shared with the engine dialogs so every modal moves the same way.
     private readonly TitleDrag _drag = new();
@@ -49,8 +48,7 @@ public sealed class RetroFileDialog : Widget
         _defaultExt = defaultExt;
         _pattern = string.IsNullOrWhiteSpace(pattern) ? "*.*" : pattern;
         _title = save ? "Save As" : "Open";
-        _fileName = defaultName ?? "";
-        _caret = _fileName.Length;
+        _name.SetTextQuiet(defaultName ?? "");
         _dir = DirectoryListing.ResolveDir(initialDir);
 
         Add(_list);
@@ -59,10 +57,7 @@ public sealed class RetroFileDialog : Widget
         _list.SelectionChanged = i =>
         {
             if (i >= 0 && i < _entries.Count && _entries[i].Kind == FsEntryKind.File)
-            {
-                _fileName = _entries[i].Name;
-                _caret = _fileName.Length;
-            }
+                _name.SetTextQuiet(_entries[i].Name);
         };
         _list.Activated = i => { if (i >= 0 && i < _entries.Count) Activate(_entries[i]); };
 
@@ -93,7 +88,7 @@ public sealed class RetroFileDialog : Widget
         // The caption strip: the title text sits at y+14, so this covers it and the padding around it.
         _titleRect = new Rectangle(x + 4, y + 4, w - 8, 26);
 
-        _fieldRect = new Rectangle(x + 14, y + 58, w - 28, 20);
+        _name.Bounds = new Rectangle(x + 14, y + 58, w - 28, 20);
 
         int listTop = y + 108;
         int listBottom = y + h - 44;
@@ -113,15 +108,7 @@ public sealed class RetroFileDialog : Widget
 
         base.Update(input, t);   // the list: mouse selection, double-click, wheel, its scrollbar
 
-        // Filename field editing.
-        foreach (char c in input.TypedChars)
-            if (!char.IsControl(c)) { _fileName = _fileName.Insert(_caret, c.ToString()); _caret++; }
-        if (input.Pressed(Keys.Back) && _caret > 0) { _fileName = _fileName.Remove(_caret - 1, 1); _caret--; }
-        if (input.Pressed(Keys.Delete) && _caret < _fileName.Length) _fileName = _fileName.Remove(_caret, 1);
-        if (input.Pressed(Keys.Left) && _caret > 0) _caret--;
-        if (input.Pressed(Keys.Right) && _caret < _fileName.Length) _caret++;
-        if (input.Pressed(Keys.Home)) _caret = 0;
-        if (input.Pressed(Keys.End)) _caret = _fileName.Length;
+        _name.Update(input, t);   // the file name field: typing, caret, selection, clipboard
 
         // List navigation is driven from here rather than by the list itself: Enter has to mean
         // "accept the typed name, or else open the selection", which is a dialog rule, not a list one.
@@ -145,19 +132,19 @@ public sealed class RetroFileDialog : Widget
     // The OK/Open action: accept the typed filename, else open the selected entry.
     private void AcceptOrOpen()
     {
-        if (_fileName.Trim().Length > 0) Accept();
+        if (_name.Text.Trim().Length > 0) Accept();
         else if (_list.Selected >= 0 && _list.Selected < _entries.Count) Activate(_entries[_list.Selected]);
     }
 
     private void Activate(FsEntry e)
     {
         if (e.IsNavigable) Navigate(e.FullPath);
-        else { _fileName = e.Name; Accept(); }
+        else { _name.SetTextQuiet(e.Name); Accept(); }
     }
 
     private void Accept()
     {
-        string name = _fileName.Trim();
+        string name = _name.Text.Trim();
         if (name.Length == 0) return;
 
         string candidate;
@@ -165,7 +152,7 @@ public sealed class RetroFileDialog : Widget
         catch { return; }
 
         // Typing a directory name navigates into it rather than accepting.
-        if (Directory.Exists(candidate)) { Navigate(candidate); _fileName = ""; _caret = 0; return; }
+        if (Directory.Exists(candidate)) { Navigate(candidate); _name.SetTextQuiet(""); return; }
 
         if (_save && _defaultExt != null && !Path.HasExtension(candidate)) candidate += _defaultExt;
         if (!_save && !File.Exists(candidate)) return;                  // Open requires an existing file
@@ -214,12 +201,7 @@ public sealed class RetroFileDialog : Widget
         r.DrawText(font, "File Name:", x + 14, y + 40, Theme.Text);
         r.DrawText(font, "Folder: " + font.FitRight(_dir, Bounds.Width - 70), x + 14, y + 86, Theme.Text);
 
-        // Filename field.
-        r.DrawPanel(_fieldRect, BevelStyle.SunkenThick, Theme.WindowBg);
-        int tx = _fieldRect.X + 4, ty = _fieldRect.Y + (_fieldRect.Height - font.LineHeight) / 2;
-        r.DrawText(font, _fileName, tx, ty, Theme.Text);
-        int cx = tx + font.MeasureWidth(_fileName.Substring(0, _caret));
-        r.Fill(cx, _fieldRect.Bottom - 4, font.MeasureWidth("n"), 2, Theme.Text);
+        _name.Draw(r);   // the file name field
 
         base.Draw(r); // the list (well, rows, scrollbar)
 

@@ -125,6 +125,7 @@ The base class handles the borderless window, native drag and resize, the render
 | `TitleBar` `MenuBar` `Toolbar` `ScrollBar` `StatusBar` `ListBox` | The stock widgets. `ListBox` is a scrollable, selectable row list; override `DrawRow` for columns. |
 | `DirectoryListing` / `DirectoryLoader` | Read a directory into rows (parent link, folders, filtered files, drives) with sizes and timestamps; the loader does it off the render thread and drops results the user has already navigated away from. |
 | `InputDialog` / `FormDialog` / `RetroFileDialog` | Modal prompt, confirm and message boxes; a multi-field form (labelled fields + check boxes) for Find and Replace and the like; a Win 3.1 Open / Save As dialog that browses directories off the render thread. |
+| `TextField` | One line of editable text in a sunken well: caret, selection, word motion, clipboard, horizontal scrolling. The dialogs above are built on it; a widget that needs an editable box owns one the way it owns a `PushButton`. |
 | `TextArea` / `TextBuffer` | Multi-line text editing: caret, selection, undo/redo, clipboard, word wrap, key and mouse model, with seams for a richer editor to subclass. `ReadOnly` gives a pane the program writes and the user can only read and copy. |
 | `Clipboard` / `Tabs` | System clipboard text with an in-process fallback; tab-to-space expansion at tab stops. |
 | `Theme` / `ThemeManager` / `Palette` | Mutable palette plus runtime theme switching. |

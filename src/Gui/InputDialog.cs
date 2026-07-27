@@ -20,13 +20,10 @@ public sealed class InputDialog : Widget
     private const int W = 320;
 
     private readonly string _title, _prompt;
-    private string _text;
-    private int _caret;
+    private readonly TextField _field;
     private int _promptY;
-    private double _blinkMs;
-    private bool _caretOn = true;
 
-    private Rectangle _titleRect, _fieldRect;
+    private Rectangle _titleRect;
 
     private readonly PushButton _ok = new("OK");
     private readonly PushButton _alt = new("");
@@ -47,9 +44,11 @@ public sealed class InputDialog : Widget
     {
         _title = title;
         _prompt = prompt;
-        _text = initial ?? "";
-        _caret = _text.Length;
+        _field = new TextField(initial ?? "") { MaxLength = 64 };
     }
+
+    /// <summary>What the field holds right now, for an owner that reads it before OK.</summary>
+    public string FieldText => _field.Text;
 
     public override void Layout()
     {
@@ -81,7 +80,7 @@ public sealed class InputDialog : Widget
 
         _titleRect = new Rectangle(x + 3, y + 3, W - 6, 16);
         _promptY = y + contentTop;
-        _fieldRect = new Rectangle(x + 14, y + contentTop + lineH + 2, W - 28, 20); // used only when !NoField
+        _field.Bounds = new Rectangle(x + 14, y + contentTop + lineH + 2, W - 28, 20); // only when !NoField
 
         _ok.Label = OkLabel;
         _cancel.Label = CancelLabel;
@@ -103,38 +102,21 @@ public sealed class InputDialog : Widget
     {
         Root()?.RequestRedraw(); // keep the caret blinking while the modal is open (idle throttle)
 
-        _blinkMs += t.ElapsedGameTime.TotalMilliseconds;
-        if (_blinkMs >= Theme.CaretBlinkMs) { _blinkMs = 0; _caretOn = !_caretOn; }
+        if (!NoField) _field.Update(input, t);
 
-        if (!NoField)
-        {
-            foreach (char c in input.TypedChars)
-                if (!char.IsControl(c) && _text.Length < 64)
-                { _text = _text.Insert(_caret, c.ToString()); _caret++; Blink(); }
-
-            if (input.Pressed(Keys.Back) && _caret > 0) { _text = _text.Remove(_caret - 1, 1); _caret--; Blink(); }
-            else if (input.Pressed(Keys.Delete) && _caret < _text.Length) { _text = _text.Remove(_caret, 1); Blink(); }
-            else if (input.Pressed(Keys.Left) && _caret > 0) { _caret--; Blink(); }
-            else if (input.Pressed(Keys.Right) && _caret < _text.Length) { _caret++; Blink(); }
-            else if (input.Pressed(Keys.Home)) { _caret = 0; Blink(); }
-            else if (input.Pressed(Keys.End)) { _caret = _text.Length; Blink(); }
-        }
-
-        if (input.Pressed(Keys.Enter)) { OnOk?.Invoke(_text); return; }
+        if (input.Pressed(Keys.Enter)) { OnOk?.Invoke(_field.Text); return; }
         // Esc still dismisses a one-button box; with nothing to cancel it means the same as OK.
-        if (input.Pressed(Keys.Escape)) { if (OkOnly) OnOk?.Invoke(_text); else OnCancel?.Invoke(); return; }
+        if (input.Pressed(Keys.Escape)) { if (OkOnly) OnOk?.Invoke(_field.Text); else OnCancel?.Invoke(); return; }
 
         // Move by the title bar, like any Win 3.1 dialog.
         var bounds = Bounds;
         if (_drag.Update(input, _titleRect, Root()?.Bounds ?? Bounds, ref bounds)) { Bounds = bounds; Layout(); }
 
         // Buttons act on release, showing pressed while held.
-        if (_ok.Update(input)) { OnOk?.Invoke(_text); return; }
+        if (_ok.Update(input)) { OnOk?.Invoke(_field.Text); return; }
         if (!OkOnly && AltLabel != null && _alt.Update(input)) { OnAlt?.Invoke(); return; }
         if (!OkOnly && _cancel.Update(input)) { OnCancel?.Invoke(); return; }
     }
-
-    private void Blink() { _blinkMs = 0; _caretOn = true; }
 
     public override void Draw(Win31Renderer r)
     {
@@ -151,18 +133,7 @@ public sealed class InputDialog : Widget
             py += r.UiFont.LineHeight + 2;
         }
 
-        if (!NoField)
-        {
-            r.DrawPanel(_fieldRect, BevelStyle.SunkenThick, Theme.WindowBg);
-            int tx = _fieldRect.X + 4;
-            int ty = _fieldRect.Y + (_fieldRect.Height - r.UiFont.LineHeight) / 2;
-            r.DrawText(r.UiFont, _text, tx, ty, Theme.Text);
-            if (_caretOn)
-            {
-                int cx = tx + r.UiFont.MeasureWidth(_text.Substring(0, _caret));
-                r.Fill(cx, ty, 1, r.UiFont.LineHeight, Theme.Text);
-            }
-        }
+        if (!NoField) _field.Draw(r);
 
         _ok.Draw(r);
         if (!OkOnly)
