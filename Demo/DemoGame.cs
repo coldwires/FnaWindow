@@ -38,6 +38,7 @@ public sealed class DemoGame : WindowGame
         {
             MenuItemDef.Item("&Open...", null, () => ShowOpen(frame)),
             MenuItemDef.Item("&Find and Replace...", null, () => ShowForm(frame)),
+            MenuItemDef.Item("&Rename...", null, () => ShowInput(frame)),
             MenuItemDef.Item("&Save Screenshot", null, () =>
             {
                 var path = CaptureScreenshot();
@@ -75,6 +76,16 @@ public sealed class DemoGame : WindowGame
             MeasureItemWidth = uiFont.MeasureWidth,
         };
         frame.SetMenu(_menu);
+
+        // FNAWINDOW_DIALOG=open|form|input opens a modal at startup, so FNAWINDOW_SHOT can capture
+        // one. A headless shot draws the window and exits, so without this no screenshot in this
+        // repo has ever contained a dialog and the modals could only be checked by hand.
+        switch (System.Environment.GetEnvironmentVariable("FNAWINDOW_DIALOG"))
+        {
+            case "open": ShowOpen(frame); break;
+            case "form": ShowForm(frame); break;
+            case "input": ShowInput(frame); break;
+        }
     }
 
     private void RefreshThemeChecks()
@@ -111,6 +122,18 @@ public sealed class DemoGame : WindowGame
             frame.CloseDialog();
         };
         dlg.OnCancel = frame.CloseDialog;
+        frame.ShowDialog(dlg);
+    }
+
+    // Exercises InputDialog WITH its text field. The About box below sets NoField, so until this
+    // existed the one-field modal was never opened from this repo either.
+    private void ShowInput(WindowFrame frame)
+    {
+        var dlg = new InputDialog("Rename", "New name:", "a name long enough to scroll the field")
+        {
+            OnOk = s => { _status.Message = "Renamed to " + s; frame.CloseDialog(); },
+            OnCancel = frame.CloseDialog,
+        };
         frame.ShowDialog(dlg);
     }
 
