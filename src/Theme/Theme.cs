@@ -43,6 +43,12 @@ public static class Theme
     /// caret band so the two do not read as the same thing in one window.</summary>
     public static Color HoverRow => Mix(WindowBg, TitleActive, 0.16f);
 
+    /// <summary>The rule between cells in a grid of them (a spreadsheet, a table). Derived from the
+    /// palette rather than declared by every palette: it is the text background pulled most of the
+    /// way to the chrome shadow, so it stays a hairline on a light theme and does not glare on a
+    /// dark one.</summary>
+    public static Color GridLine => Mix(WindowBg, MidEdge, 0.55f);
+
     private static Color Mix(Color a, Color b, float t) => new(
         (int)(a.R + (b.R - a.R) * t),
         (int)(a.G + (b.G - a.G) * t),
