@@ -47,12 +47,20 @@ public sealed partial class BitmapFont
     /// Courier is 13.</param>
     /// <param name="yOffset">Pixels to nudge every glyph down, to centre a short font in a taller
     /// cell.</param>
+    /// <param name="antialiased">Keep the rasteriser's grey coverage instead of hard-thresholding
+    /// every lit pixel to opaque. Off by default, because 1-bit glyphs ARE the Windows 3.1 look
+    /// and every app built on this engine so far wants them. Turn it on for a modern-looking app,
+    /// where hard edges read as harsh over a long reading session rather than as period-correct.
+    ///
+    /// Only meaningful for a TrueType face. A .FON raster font has no greys to keep, so this also
+    /// stops asking GDI for raster precision - otherwise it hands back a bitmap face that cannot
+    /// be antialiased and the flag appears to do nothing.</param>
     public static BitmapFont? FromSystemFont(GraphicsDevice gd, string family, int height,
         bool bold = false, int lineHeight = 0, int yOffset = 0,
-        IReadOnlyList<int>? codepoints = null)
+        IReadOnlyList<int>? codepoints = null, bool antialiased = false)
     {
         if (!Supported) return null;
-        try { return Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints); }
+        try { return Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints, antialiased); }
         catch { return null; }
     }
 
@@ -81,7 +89,7 @@ public sealed partial class BitmapFont
     }
 
     private static BitmapFont? Rasterise(GraphicsDevice gd, string family, int height, bool bold,
-        int lineHeight, int yOffset, IReadOnlyList<int>? codepoints)
+        int lineHeight, int yOffset, IReadOnlyList<int>? codepoints, bool antialiased = false)
     {
         var codes = codepoints ?? DefaultCodepoints;
 
@@ -91,7 +99,7 @@ public sealed partial class BitmapFont
 
         try
         {
-            font = MakeFont(family, height, bold);
+            font = MakeFont(family, height, bold, antialiased);
             if (font == IntPtr.Zero) return null;
             prevFont = SelectObject(dc, font);
 
@@ -134,15 +142,28 @@ public sealed partial class BitmapFont
             }
             GdiFlush();
 
-            // Read the DIB back. Any lit pixel becomes opaque white so SpriteBatch can tint it;
-            // everything else is fully transparent. Raster fonts are 1-bit so this is exact, and
-            // for a TrueType face it hard-thresholds whatever the (antialiasing-off) rasteriser did.
+            // Read the DIB back. Glyphs were drawn white on black, so a pixel's brightness IS its
+            // coverage.
+            //
+            // Thresholded (the default): any lit pixel becomes opaque white so SpriteBatch can
+            // tint it. Raster fonts are 1-bit so this is exact.
+            //
+            // Antialiased: keep the coverage as alpha, written PREMULTIPLIED (v,v,v,v). The batch
+            // blends premultiplied, and BitmapFont.Draw tints by multiplying, so an opaque tint
+            // colour times (v,v,v,v) lands as that colour at coverage v - which is what the blend
+            // expects. Writing it straight (255,255,255,v) would blend as white haze around every
+            // glyph instead.
             int count = AtlasW * atlasH;
             var raw = new int[count];
             Marshal.Copy(bits, raw, 0, count);
             var pixels = new Color[count];
             for (int i = 0; i < count; i++)
-                pixels[i] = (raw[i] & 0x00FFFFFF) != 0 ? Color.White : Color.Transparent;
+            {
+                int rgb = raw[i] & 0x00FFFFFF;
+                if (!antialiased) { pixels[i] = rgb != 0 ? Color.White : Color.Transparent; continue; }
+                int v = rgb & 0xFF;                     // grey, so any channel will do
+                pixels[i] = v == 0 ? Color.Transparent : new Color(v, v, v, v);
+            }
 
             var tex = new Texture2D(gd, AtlasW, atlasH);
             tex.SetData(pixels);
@@ -175,9 +196,11 @@ public sealed partial class BitmapFont
         return list.ToArray();
     }
 
-    private static IntPtr MakeFont(string family, int height, bool bold) =>
+    private static IntPtr MakeFont(string family, int height, bool bold, bool antialiased = false) =>
         CreateFontW(height, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, 0, 0, 0,
-            DEFAULT_CHARSET, OUT_RASTER_PRECIS, 0, NONANTIALIASED_QUALITY, 0, family);
+            DEFAULT_CHARSET,
+            antialiased ? OUT_DEFAULT_PRECIS : OUT_RASTER_PRECIS, 0,
+            antialiased ? ANTIALIASED_QUALITY : NONANTIALIASED_QUALITY, 0, family);
 
     private static IntPtr CreateDib(IntPtr dc, int w, int h, out IntPtr bits)
     {
@@ -197,7 +220,12 @@ public sealed partial class BitmapFont
     private const int FW_NORMAL = 400, FW_BOLD = 700;
     private const uint DEFAULT_CHARSET = 1;
     private const uint OUT_RASTER_PRECIS = 6;         // reach the .FON faces, not a TrueType stand-in
+    private const uint OUT_DEFAULT_PRECIS = 0;        // let GDI pick: a .FON cannot be antialiased
     private const uint NONANTIALIASED_QUALITY = 3;    // 1-bit glyphs, which is the whole look
+    private const uint ANTIALIASED_QUALITY = 4;       // grey coverage; ClearType is deliberately
+                                                      // not used - it is subpixel and coloured,
+                                                      // which a tinted single-channel atlas cannot
+                                                      // carry
     private const int TRANSPARENT = 1;
 
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
