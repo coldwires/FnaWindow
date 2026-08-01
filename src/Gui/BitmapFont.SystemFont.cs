@@ -114,12 +114,23 @@ public sealed partial class BitmapFont
                 advance[c] = GetCharWidth32W(dc, (uint)c, (uint)c, buf) ? Math.Max(0, buf[0]) : tm.tmAveCharWidth;
             }
 
+            // A cell is the glyph's advance plus side bearing, NOT just the advance.
+            //
+            // A 1-bit raster glyph never paints outside its advance, so a cell of exactly the
+            // advance was safe. An antialiased TrueType glyph does: the coverage fringe spills a
+            // pixel, and letters like W and italic forms overhang by design. With a cell of exactly
+            // the advance, everything past the edge is sliced off and the text looks chewed.
+            //
+            // The bearing is carried as a negative XOff so drawing still starts at the pen
+            // position and the advance still governs layout - only the sampled rectangle grows.
+            int bearing = antialiased ? 2 : 0;
+
             const int AtlasW = 512, Pad = 1;
             var place = new Dictionary<int, Rectangle>(codes.Count);
             int x = Pad, y = Pad, maxAdvance = 0;
             foreach (int c in codes)
             {
-                int w = Math.Max(1, advance[c]);
+                int w = Math.Max(1, advance[c]) + bearing * 2;
                 if (x + w + Pad > AtlasW) { x = Pad; y += cellH + Pad; }
                 place[c] = new Rectangle(x, y, w, cellH);
                 x += w + Pad;
@@ -138,7 +149,9 @@ public sealed partial class BitmapFont
             foreach (int c in codes)
             {
                 var r = place[c];
-                TextOutW(dc, r.X, r.Y, char.ConvertFromUtf32(c), 1);
+                // Inset by the bearing so the glyph sits centred in its padded cell and its
+                // overhang has somewhere to go on both sides.
+                TextOutW(dc, r.X + bearing, r.Y, char.ConvertFromUtf32(c), 1);
             }
             GdiFlush();
 
@@ -170,7 +183,7 @@ public sealed partial class BitmapFont
 
             var glyphs = new Dictionary<int, GlyphRec>(codes.Count);
             foreach (int c in codes)
-                glyphs[c] = new GlyphRec(place[c], advance[c], 0, yOffset);
+                glyphs[c] = new GlyphRec(place[c], advance[c], -bearing, yOffset);
 
             return new BitmapFont(tex, glyphs, lineHeight > 0 ? lineHeight : cellH, maxAdvance);
         }
