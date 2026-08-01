@@ -114,16 +114,22 @@ public sealed partial class BitmapFont
                 advance[c] = GetCharWidth32W(dc, (uint)c, (uint)c, buf) ? Math.Max(0, buf[0]) : tm.tmAveCharWidth;
             }
 
-            // A cell is the glyph's advance plus side bearing, NOT just the advance.
+            // A cell is the glyph's advance plus a side bearing, NOT just the advance.
             //
-            // A 1-bit raster glyph never paints outside its advance, so a cell of exactly the
-            // advance was safe. An antialiased TrueType glyph does: the coverage fringe spills a
-            // pixel, and letters like W and italic forms overhang by design. With a cell of exactly
-            // the advance, everything past the edge is sliced off and the text looks chewed.
+            // The old assumption - ink never leaves the advance - holds for a raster .FON face and
+            // NOT for a TrueType one, at any quality setting. A hinted TrueType glyph overhangs its
+            // advance by a pixel routinely, and an antialiased one also spills a coverage fringe.
+            // With a cell of exactly the advance, whatever crosses the edge is sliced off and the
+            // text looks chewed a pixel at a time.
             //
-            // The bearing is carried as a negative XOff so drawing still starts at the pen
-            // position and the advance still governs layout - only the sampled rectangle grows.
-            int bearing = antialiased ? 2 : 0;
+            // Applied unconditionally: it was first added only for the antialiased path, which left
+            // the 1-bit TrueType case still clipping, and that is the case where a missing pixel is
+            // most visible because there is no soft edge to disguise it. A raster font simply never
+            // uses the extra room, so the padding costs it nothing but atlas space.
+            //
+            // Carried as a negative XOff, so drawing still starts at the pen position and the
+            // advance still governs layout - only the sampled rectangle grows.
+            const int bearing = 2;
 
             const int AtlasW = 512, Pad = 1;
             var place = new Dictionary<int, Rectangle>(codes.Count);
