@@ -95,6 +95,13 @@ public sealed class VistaSkin : Skin
         else Proc.DrawWindowFrame(r, rect);
     }
 
+    public override void DrawChildWindowFrame(Win31Renderer r, Rectangle rect)
+    {
+        var tex = VistaPng.ChildFrameTex() ?? VistaPng.FrameTex();
+        if (tex != null) Win31Png.NineSlice(r.Sb, tex, rect);
+        else Proc.DrawWindowFrame(r, rect);
+    }
+
     public override void DrawButton(Win31Renderer r, Rectangle rect, bool pressed)
     {
         var tex = VistaPng.ButtonTex(pressed);
@@ -117,7 +124,7 @@ public sealed class VistaSkin : Skin
 /// Win31Png so the two art skins are used the same way.</summary>
 public static class VistaPng
 {
-    private static Texture2D? _raisedThin, _sunkenThin, _raisedThick, _sunkenThick, _windowFrame, _menuCheck, _scrollCorner, _menuSep;
+    private static Texture2D? _raisedThin, _sunkenThin, _raisedThick, _sunkenThick, _windowFrame, _childFrame, _menuCheck, _scrollCorner, _menuSep;
     private static Texture2D? _button, _buttonDown, _capActive, _capInactive;
     private static readonly Texture2D?[] _caption = new Texture2D?[8]; // [kind*2 + pressed], kind = CaptionButton
     private static readonly Texture2D?[] _scroll = new Texture2D?[8];  // [dir*2 + pressed], dir = ScrollArrowDir
@@ -149,6 +156,7 @@ public static class VistaPng
         _raisedThick = L("panel-raised.png");
         _sunkenThick = L("panel-sunken.png");
         _windowFrame = L("frame-window.png");
+        _childFrame = L("frame-child.png");
         _menuCheck = L("menu-check.png");
         _scrollCorner = L("scroll-corner.png");
         _menuSep = L("menu-sep.png");
@@ -183,6 +191,7 @@ public static class VistaPng
     public static Texture2D? CaptionTex(CaptionButton kind, bool pressed) => _caption[(int)kind * 2 + (pressed ? 1 : 0)];
     public static Texture2D? ScrollTex(ScrollArrowDir dir, bool pressed) => _scroll[(int)dir * 2 + (pressed ? 1 : 0)];
     public static Texture2D? FrameTex() => _windowFrame;
+    public static Texture2D? ChildFrameTex() => _childFrame;
     public static Texture2D? MenuCheckTex() => _menuCheck;
     public static Texture2D? ScrollCornerTex() => _scrollCorner;
     public static Texture2D? MenuSepTex() => _menuSep;

@@ -64,6 +64,11 @@ public abstract class Skin
     /// flat fill for any other color a caller passes.</summary>
     public virtual void DrawCaptionFill(Win31Renderer r, Rectangle rect, Color bg) => r.Fill(rect, bg);
 
+    /// <summary>An MDI child's frame. Defaults to the window frame; a skin whose outer frame
+    /// rounds (paired with a window region) squares this one - an inner window has no region,
+    /// so a rounded ring would expose the child's own fill at the corners.</summary>
+    public virtual void DrawChildWindowFrame(Win31Renderer r, Rectangle rect) => DrawWindowFrame(r, rect);
+
     public virtual void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
     {
         r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
