@@ -152,6 +152,11 @@ public class WindowGame : Game
     /// Any face that is missing leaves the shipped atlas in place, so this can never leave an app
     /// without a font.
     /// </summary>
+    /// <summary>Rounded window corners, in pixels; 0 (default) leaves the window rectangular.
+    /// Pair with skin frame art whose corners round at the same radius - the OS clips the
+    /// corner pixels, so the desktop shows through the arc instead of a square artifact.</summary>
+    protected virtual int WindowCornerRadius => 0;
+
     protected virtual bool UseSystemFonts => false;
 
     private void ApplySystemFonts()
@@ -401,6 +406,9 @@ public class WindowGame : Game
 
     private void Relayout()
     {
+        if (WindowCornerRadius > 0 && _hwnd != IntPtr.Zero)
+            WindowShape.Apply(_hwnd, Window.ClientBounds.Width, Window.ClientBounds.Height, WindowCornerRadius);
+
         if (Root == null) return;
         var vp = GraphicsDevice.Viewport;
         Root.Bounds = new Rectangle(0, 0, vp.Width, vp.Height);
