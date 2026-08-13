@@ -16,6 +16,9 @@ public static class WindowCaption
     /// <summary>System box on the left; minimize then maximize on the right; all vertically centered.
     /// Each button's size comes from the skin, so authored art of any size lays out un-stretched.</summary>
     public static void LayoutButtons(Rectangle title, out Rectangle sys, out Rectangle min, out Rectangle max)
+        => LayoutButtons(title, out sys, out min, out max, out _);
+
+    public static void LayoutButtons(Rectangle title, out Rectangle sys, out Rectangle min, out Rectangle max, out Rectangle close)
     {
         var skin = ThemeManager.Skin;
         int ss = skin.CaptionButtonSize(CaptionButton.System);
@@ -25,14 +28,20 @@ public static class WindowCaption
         sys = skin.ShowSystemButton
             ? new Rectangle(title.X, Cy(ss) - 1, ss, ss) // system box nudged left + 1px up
             : Rectangle.Empty;                           // no slot: no hit area, no draw
-        max = new Rectangle(title.Right - xs, Cy(xs), xs, xs);
+        int cs = skin.CaptionButtonSize(CaptionButton.Close);
+        close = skin.ShowCloseButton ? new Rectangle(title.Right - cs, Cy(cs), cs, cs) : Rectangle.Empty;
+        int right = skin.ShowCloseButton ? close.X - 2 : title.Right;
+        max = new Rectangle(right - xs, Cy(xs), xs, xs);
         min = new Rectangle(max.X - ms, Cy(ms), ms, ms);
     }
 
     /// <summary>Which caption button a point is over: 0 sys, 1 min, 2 max, or -1 none. Shared so every
     /// window hit-tests its caption buttons the same way.</summary>
     public static int HitButton(Point p, Rectangle sys, Rectangle min, Rectangle max)
-        => sys.Contains(p) ? 0 : min.Contains(p) ? 1 : max.Contains(p) ? 2 : -1;
+        => HitButton(p, sys, min, max, Rectangle.Empty);
+
+    public static int HitButton(Point p, Rectangle sys, Rectangle min, Rectangle max, Rectangle close)
+        => sys.Contains(p) ? 0 : min.Contains(p) ? 1 : max.Contains(p) ? 2 : close.Contains(p) ? 3 : -1;
 
     /// <summary>
     /// Fill the caption, draw the centered title in <paramref name="font"/>, and the three buttons via
@@ -41,6 +50,10 @@ public static class WindowCaption
     /// </summary>
     public static void Draw(Win31Renderer r, Rectangle title, string text, Color bg, Color textColor,
         Rectangle sys, Rectangle min, Rectangle max, int pressed, bool maximized, BitmapFont font)
+        => Draw(r, title, text, bg, textColor, sys, min, max, Rectangle.Empty, pressed, maximized, font);
+
+    public static void Draw(Win31Renderer r, Rectangle title, string text, Color bg, Color textColor,
+        Rectangle sys, Rectangle min, Rectangle max, Rectangle close, int pressed, bool maximized, BitmapFont font)
     {
         var skin = ThemeManager.Skin;
         skin.DrawCaptionFill(r, title, bg);
@@ -54,5 +67,6 @@ public static class WindowCaption
         if (sys.Width > 0) skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0);
         skin.DrawCaptionButton(r, min, CaptionButton.Minimize, pressed == 1);
         skin.DrawCaptionButton(r, max, maximized ? CaptionButton.Restore : CaptionButton.Maximize, pressed == 2);
+        if (close.Width > 0) skin.DrawCaptionButton(r, close, CaptionButton.Close, pressed == 3);
     }
 }

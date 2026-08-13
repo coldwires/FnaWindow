@@ -64,6 +64,10 @@ public abstract class Skin
     /// <summary>Whether the caption title centers (3.1) or left-aligns (95 onward).</summary>
     public virtual bool CenterCaptionText => true;
 
+    /// <summary>Whether captions carry a close button at the far right (95 onward). Off, the
+    /// slot disappears; 3.1 closes through the system box.</summary>
+    public virtual bool ShowCloseButton => false;
+
     // -- Small glyph-bearing buttons (title caption + scrollbar) -----------
     // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
     // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.
@@ -94,6 +98,20 @@ public abstract class Skin
             case CaptionButton.Minimize: DrawMinGlyph(r, b); break;
             case CaptionButton.Maximize: DrawMaxGlyph(r, b); break;
             case CaptionButton.Restore: DrawRestoreGlyph(r, b); break;
+            case CaptionButton.Close: DrawCloseGlyph(r, b); break;
+        }
+    }
+
+    /// <summary>The default close glyph: a centered X of two diagonals.</summary>
+    protected static void DrawCloseGlyph(Win31Renderer r, Rectangle b)
+    {
+        int cx = b.X + b.Width / 2, cy = b.Y + b.Height / 2;
+        for (int i = -3; i <= 3; i++)
+        {
+            r.Fill(cx + i, cy + i, 1, 1, Theme.Text);
+            r.Fill(cx + i + 1, cy + i, 1, 1, Theme.Text);
+            r.Fill(cx + i, cy - i, 1, 1, Theme.Text);
+            r.Fill(cx + i + 1, cy - i, 1, 1, Theme.Text);
         }
     }
 
@@ -187,7 +205,7 @@ public abstract class Skin
 }
 
 /// <summary>Which caption button (drives the glyph the skin draws).</summary>
-public enum CaptionButton { System, Minimize, Maximize, Restore }
+public enum CaptionButton { System, Minimize, Maximize, Restore, Close }
 
 /// <summary>Scroll-arrow direction (drives the triangle the skin draws).</summary>
 public enum ScrollArrowDir { Up, Down, Left, Right }

@@ -20,28 +20,29 @@ public sealed class TitleBar : Widget
     public Action? OnClose;
 
     private Rectangle _sysRect, _minRect, _maxRect;
-    private int _pressed = -1; // 0=sys 1=min 2=max
+    private Rectangle _closeRect;
+    private int _pressed = -1; // 0=sys 1=min 2=max 3=close
 
     /// <summary>True where a borderless host may grab the window: the bar, minus its buttons.</summary>
     public bool IsOnDragArea(Point p)
         => Bounds.Contains(p) && !_sysRect.Contains(p) && !_minRect.Contains(p) && !_maxRect.Contains(p);
 
     public override void Layout()
-        => WindowCaption.LayoutButtons(Bounds, out _sysRect, out _minRect, out _maxRect);
+        => WindowCaption.LayoutButtons(Bounds, out _sysRect, out _minRect, out _maxRect, out _closeRect);
 
     public override void Update(InputState input, GameTime t)
     {
         if (InputBlocked) return;
 
         if (input.LeftPressed)
-            _pressed = WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect);
+            _pressed = WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect, _closeRect);
         if (input.LeftReleased)
         {
             // Fire only if released over the same button that was pressed. Single click on the system
             // box closes (no fiddly double-click).
-            if (_pressed >= 0 && WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect) == _pressed)
+            if (_pressed >= 0 && WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect, _closeRect) == _pressed)
             {
-                if (_pressed == 0) OnClose?.Invoke();
+                if (_pressed == 0 || _pressed == 3) OnClose?.Invoke();
                 else if (_pressed == 1) OnMinimize?.Invoke();
                 else if (_pressed == 2) OnMaximize?.Invoke();
             }
@@ -53,5 +54,5 @@ public sealed class TitleBar : Widget
         => WindowCaption.Draw(r, Bounds, Title,
             Active ? Theme.TitleActive : Theme.Face,
             Active ? Theme.TitleText : Theme.Text,
-            _sysRect, _minRect, _maxRect, _pressed, Maximized, Font ?? r.UiBoldFont);
+            _sysRect, _minRect, _maxRect, _closeRect, _pressed, Maximized, Font ?? r.UiBoldFont);
 }

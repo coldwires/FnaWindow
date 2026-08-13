@@ -126,7 +126,7 @@ public static class Win31Png
 
     // Asymmetric slice margins for the button art: thin highlight side vs thick shadow side.
     public const int BtnThin = 1, BtnThick = 3;
-    private static readonly Texture2D?[] _caption = new Texture2D?[8]; // [kind*2 + pressed], kind = CaptionButton
+    private static readonly Texture2D?[] _caption = new Texture2D?[12]; // [kind*2 + pressed], kind = CaptionButton
     private static readonly Texture2D?[] _scroll = new Texture2D?[8];  // [dir*2 + pressed], dir = ScrollArrowDir
     private static bool _loaded;
 

@@ -33,6 +33,7 @@ public sealed class VistaSkin : Skin
     public override int MenuBarTuck => 0;          // keep the caption's shadow hairline
     public override bool ShowSystemButton => false;
     public override bool CenterCaptionText => false;
+    public override bool ShowCloseButton => true;
 
     public override int CaptionButtonSize(CaptionButton kind)
         => VistaPng.CaptionTex(kind, false)?.Width ?? base.CaptionButtonSize(kind);
@@ -142,7 +143,7 @@ public static class VistaPng
 {
     private static Texture2D? _raisedThin, _sunkenThin, _raisedThick, _sunkenThick, _windowFrame, _childFrame, _menuCheck, _scrollCorner, _menuSep;
     private static Texture2D? _button, _buttonDown, _capActive, _capInactive;
-    private static readonly Texture2D?[] _caption = new Texture2D?[8]; // [kind*2 + pressed], kind = CaptionButton
+    private static readonly Texture2D?[] _caption = new Texture2D?[12]; // [kind*2 + pressed], kind = CaptionButton
     private static readonly Texture2D?[] _scroll = new Texture2D?[8];  // [dir*2 + pressed], dir = ScrollArrowDir
     private static bool _loaded;
 
@@ -181,7 +182,7 @@ public static class VistaPng
         _capActive = L("caption-active.png");
         _capInactive = L("caption-inactive.png");
 
-        string[] caps = { "btn-sys", "btn-min", "btn-max", "btn-restore" }; // order = CaptionButton enum
+        string[] caps = { "btn-sys", "btn-min", "btn-max", "btn-restore", "btn-close" }; // order = CaptionButton enum
         for (int k = 0; k < caps.Length; k++)
         {
             _caption[k * 2] = L(caps[k] + ".png");
