@@ -49,6 +49,14 @@ public abstract class Skin
     public virtual int MdiChildTitleHeight => 19;
     public virtual int ScrollBarThickness => 16;
 
+    /// <summary>How far window content insets from the window edge - the frame art's opaque
+    /// band. The classic 3.1 frame (black/face/face/black) is 4px.</summary>
+    public virtual int WindowFrameThickness => 4;
+
+    /// <summary>How far the menu bar tucks up over the caption's bottom row (a 3.1 detail);
+    /// a skin whose caption ends in a shadow hairline sets 0.</summary>
+    public virtual int MenuBarTuck => 1;
+
     // -- Small glyph-bearing buttons (title caption + scrollbar) -----------
     // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
     // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.

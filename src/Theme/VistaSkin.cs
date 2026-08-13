@@ -29,6 +29,8 @@ public sealed class VistaSkin : Skin
     // Vista's taller caption; the 4x30 gradient strips were authored for exactly this.
     public override int TitleBarHeight => 30;
     public override int MdiChildTitleHeight => 30;
+    public override int WindowFrameThickness => 6; // the ring art's opaque band
+    public override int MenuBarTuck => 0;          // keep the caption's shadow hairline
 
     public override int CaptionButtonSize(CaptionButton kind)
         => VistaPng.CaptionTex(kind, false)?.Width ?? base.CaptionButtonSize(kind);
