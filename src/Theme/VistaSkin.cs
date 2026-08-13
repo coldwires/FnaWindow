@@ -59,8 +59,16 @@ public sealed class VistaSkin : Skin
         // for which gradient strip to draw. Any other color (a custom caller) stays a flat fill.
         var tex = bg == Theme.TitleActive ? VistaPng.CaptionActiveTex()
                 : bg == Theme.TitleInactive ? VistaPng.CaptionInactiveTex() : null;
-        if (tex != null) r.Sb.Draw(tex, rect, Color.White); // horizontally uniform strip, safe to stretch
-        else base.DrawCaptionFill(r, rect, bg);
+        if (tex == null || rect.Height < 3) { base.DrawCaptionFill(r, rect, bg); return; }
+        // Vertical 3-slice: the strip's top and bottom rows are 1px hairlines (highlight and
+        // shadow) that point-scaling would drop, so they draw 1:1 and only the middle stretches.
+        int w = tex.Width, h = tex.Height;
+        r.Sb.Draw(tex, new Rectangle(rect.X, rect.Y + 1, rect.Width, rect.Height - 2),
+                  new Rectangle(0, 1, w, h - 2), Color.White);
+        r.Sb.Draw(tex, new Rectangle(rect.X, rect.Y, rect.Width, 1),
+                  new Rectangle(0, 0, w, 1), Color.White);
+        r.Sb.Draw(tex, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1),
+                  new Rectangle(0, h - 1, w, 1), Color.White);
     }
 
     public override void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
