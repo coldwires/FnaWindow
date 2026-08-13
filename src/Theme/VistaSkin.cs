@@ -26,6 +26,9 @@ public sealed class VistaSkin : Skin
     public override int Thickness(BevelStyle style)
         => style is BevelStyle.RaisedThick or BevelStyle.SunkenThick ? 2 : 1; // matches the 5x5 / 3x3 ring art
 
+    // Vista's taller caption; the 4x30 gradient strips were authored for exactly this.
+    public override int TitleBarHeight => 30;
+
     public override int CaptionButtonSize(CaptionButton kind)
         => VistaPng.CaptionTex(kind, false)?.Width ?? base.CaptionButtonSize(kind);
 
