@@ -482,12 +482,17 @@ public class TextArea : Widget
         {
             if (shift) OutdentLines();
             else if (HasSel) IndentLines();
-            else InsertText(new string(' ', Tabs.Width), coalesce: false);
+            else InsertText(new string(' ', IndentWidth), coalesce: false);
             return;
         }
         if (input.Pressed(Keys.Back))   { Backspace(); return; }
         if (input.Pressed(Keys.Delete)) { DeleteKey(); return; }
     }
+
+    /// <summary>Spaces per indent level for Tab, Shift+Tab and IndentLines/OutdentLines. The
+    /// default is the global Tabs.Width; an editor whose language decides its own width (or uses
+    /// hard tabs) overrides this so Tab and Enter agree.</summary>
+    protected virtual int IndentWidth => Tabs.Width;
 
     // -- Editing -----------------------------------------------------------
 
@@ -526,7 +531,7 @@ public class TextArea : Widget
         var (first, last) = SelectedLineRange();
         // Replace the whole (contiguous) line range in one edit so the indent is a single undo step.
         // A per-line Insert loop pushes one undo op per line, so one Ctrl+Z un-indents just one line.
-        string pad = new string(' ', Tabs.Width);
+        string pad = new string(' ', IndentWidth);
         var lines = new string[last - first + 1];
         for (int ln = first; ln <= last; ln++) lines[ln - first] = pad + Buf.Line(ln);
         Buf.Replace(new Position(first, 0), new Position(last, Buf.LineLength(last)), string.Join("\n", lines));
@@ -544,7 +549,7 @@ public class TextArea : Widget
         {
             string line = Buf.Line(ln);
             int remove = 0;
-            while (remove < Tabs.Width && remove < line.Length && line[remove] == ' ') remove++;
+            while (remove < IndentWidth && remove < line.Length && line[remove] == ' ') remove++;
             if (remove == 0 && line.Length > 0 && line[0] == '\t') remove = 1; // a leading hard tab
             if (remove > 0) changed = true;
             lines[ln - first] = line.Substring(remove);
