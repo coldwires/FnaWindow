@@ -115,6 +115,24 @@ public abstract class Skin
         }
     }
 
+    /// <summary>The move-outline frame at the proposed bounds while a child window drags:
+    /// a 4px checkerboard dither of black and white pixels, the 3.1 drag rectangle.</summary>
+    public virtual void DrawDragOutline(Win31Renderer r, Rectangle b)
+    {
+        int t = System.Math.Min(4, System.Math.Min(b.Width, b.Height) / 2);
+        if (t <= 0) return;
+        void Band(Rectangle band)
+        {
+            for (int y = band.Y; y < band.Bottom; y++)
+                for (int x = band.X; x < band.Right; x++)
+                    r.Fill(x, y, 1, 1, ((x + y) & 1) == 0 ? Color.Black : Color.White);
+        }
+        Band(new Rectangle(b.X, b.Y, b.Width, t));
+        Band(new Rectangle(b.X, b.Bottom - t, b.Width, t));
+        Band(new Rectangle(b.X, b.Y + t, t, b.Height - 2 * t));
+        Band(new Rectangle(b.Right - t, b.Y + t, t, b.Height - 2 * t));
+    }
+
     /// <summary>A menu row's checkmark at (cx, cy) in <paramref name="color"/>. Default is the 5px tick.</summary>
     public virtual void DrawMenuCheck(Win31Renderer r, int cx, int cy, Color color)
     {

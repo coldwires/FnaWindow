@@ -157,6 +157,13 @@ public class WindowGame : Game
     /// corner pixels, so the desktop shows through the arc instead of a square artifact.</summary>
     protected virtual int WindowCornerRadius => 0;
 
+    /// <summary>When true, dragging the caption or a resize edge moves a dithered outline
+    /// instead of the live window (the Win 3.1 move/size), and the window follows on release. Off by default. The
+    /// native extras that live inside the OS move loop (drag-to-edge snap, Snap Layouts) do not
+    /// apply to an outline drag; Win+Arrow still works. Maximized windows keep the native drag,
+    /// so drag-down restore behaves as always.</summary>
+    protected virtual bool OutlineWindowDrag => false;
+
     protected virtual bool UseSystemFonts => false;
 
     private void ApplySystemFonts()
@@ -329,7 +336,17 @@ public class WindowGame : Game
                 // the frame is collapsed. Installed the other way round, the original wndproc
                 // answers it and the client area keeps a full frame's worth of inset for good,
                 // since nothing sends another one until the window is next resized.
-                WindowChrome.InstallHitTest(_hwnd, WindowHitTest);
+                // In outline mode the caption and edges must NOT reach Windows as caption/edge
+                // codes (that starts the native live move/size loop); UpdateOutlineDrag runs
+                // those drags instead. WindowHitTest itself stays a pure classifier, because
+                // the resize cursors and the drag state machine both read it. Maximized keeps
+                // the native caption so drag-down restore still works.
+                WindowChrome.InstallHitTest(_hwnd, (cx, cy) =>
+                {
+                    int code = WindowHitTest(cx, cy);
+                    return OutlineWindowDrag && !_maximized && code != WindowChrome.HTCLIENT
+                        ? WindowChrome.HTCLIENT : code;
+                });
                 WindowChrome.MakeBorderless(_hwnd, Graphics.PreferredBackBufferWidth, Graphics.PreferredBackBufferHeight);
                 _borderless = true;
             }
@@ -424,7 +441,8 @@ public class WindowGame : Game
     protected override void Update(GameTime gameTime)
     {
         if (MainThread.Drain()) RequestRedraw();   // apply background-thread work on the UI thread
-        Input.Update(gameTime, IsActive);          // IsActive false -> ignore input for an unfocused window
+        UpdateOutlineDrag();                       // the 3.1-style caption/edge drag, when opted in
+        Input.Update(gameTime, IsActive && !_odDragging); // unfocused or outline-dragging -> widgets see no input
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
@@ -547,6 +565,94 @@ public class WindowGame : Game
         }
         if (Caption.IsOnDragArea(new Point(cx, cy))) return WindowChrome.HTCAPTION;
         return WindowChrome.HTCLIENT;
+    }
+
+    // ---- outline drag (see OutlineWindowDrag) ------------------------------------------------
+    // Polled off the OS cursor, not InputState: mid-drag the cursor leaves the client area (the
+    // window is not moving with it), where in-window mouse state cannot follow.
+    private bool _odWasDown, _odDragging, _odShown;
+    private int _odCode;                    // HTCAPTION for a move, an edge code for a resize
+    private Point _odCursorStart, _odLastPress;
+    private Rectangle _odWindowStart;
+    private long _odLastPressAt;
+
+    private void UpdateOutlineDrag()
+    {
+        if (!OutlineWindowDrag || _hwnd == IntPtr.Zero) return;
+        bool down = DragOutline.LeftButtonDown();
+
+        if (!_odDragging)
+        {
+            if (down && !_odWasDown && IsActive && !_maximized)
+            {
+                var s = DragOutline.CursorScreen();
+                var c = DragOutline.ToClient(_hwnd, s);
+                var vp = GraphicsDevice.Viewport;
+                int code = c.X >= 0 && c.Y >= 0 && c.X < vp.Width && c.Y < vp.Height
+                    ? WindowHitTest(c.X, c.Y) : WindowChrome.HTCLIENT;
+                if (code == WindowChrome.HTCAPTION)
+                {
+                    // Double-click on the caption maximizes, which HTCAPTION used to provide.
+                    long now = Environment.TickCount64;
+                    bool dbl = now - _odLastPressAt <= DragOutline.DoubleClickMs()
+                        && Math.Abs(s.X - _odLastPress.X) <= 4 && Math.Abs(s.Y - _odLastPress.Y) <= 4;
+                    _odLastPressAt = now; _odLastPress = s;
+                    if (dbl) { WindowChrome.Maximize(_hwnd); code = WindowChrome.HTCLIENT; }
+                }
+                if (code != WindowChrome.HTCLIENT)
+                {
+                    _odDragging = true; _odShown = false;
+                    _odCode = code;
+                    _odCursorStart = s;
+                    _odWindowStart = DragOutline.WindowBounds(_hwnd);
+                }
+            }
+        }
+        else if (down)
+        {
+            var s = DragOutline.CursorScreen();
+            if (_odShown)
+                DragOutline.Show(OdProposed(s));
+            else if (Math.Abs(s.X - _odCursorStart.X) > 2 || Math.Abs(s.Y - _odCursorStart.Y) > 2)
+            {
+                DragOutline.Show(OdProposed(s)); // a sloppy click is not a drag
+                _odShown = true;
+            }
+        }
+        else
+        {
+            _odDragging = false;
+            if (_odShown)
+            {
+                _odShown = false;
+                DragOutline.Hide();
+                var b = OdProposed(DragOutline.CursorScreen());
+                if (b != _odWindowStart) DragOutline.SetWindowBounds(_hwnd, b);
+            }
+        }
+        _odWasDown = down;
+    }
+
+    // The bounds the outline proposes for the cursor at s: the whole frame shifted for a move,
+    // or the grabbed edges pulled (and clamped to a sane minimum) for a resize.
+    private Rectangle OdProposed(Point s)
+    {
+        int dx = s.X - _odCursorStart.X, dy = s.Y - _odCursorStart.Y;
+        var w = _odWindowStart;
+        if (_odCode == WindowChrome.HTCAPTION)
+            return new Rectangle(w.X + dx, w.Y + dy, w.Width, w.Height);
+
+        const int MinW = 320, MinH = 200;
+        int l = w.X, tp = w.Y, rt = w.Right, bt = w.Bottom;
+        bool left = _odCode is WindowChrome.HTLEFT or WindowChrome.HTTOPLEFT or WindowChrome.HTBOTTOMLEFT;
+        bool right = _odCode is WindowChrome.HTRIGHT or WindowChrome.HTTOPRIGHT or WindowChrome.HTBOTTOMRIGHT;
+        bool top = _odCode is WindowChrome.HTTOP or WindowChrome.HTTOPLEFT or WindowChrome.HTTOPRIGHT;
+        bool bottom = _odCode is WindowChrome.HTBOTTOM or WindowChrome.HTBOTTOMLEFT or WindowChrome.HTBOTTOMRIGHT;
+        if (left) l = Math.Min(l + dx, rt - MinW);
+        if (right) rt = Math.Max(rt + dx, l + MinW);
+        if (top) tp = Math.Min(tp + dy, bt - MinH);
+        if (bottom) bt = Math.Max(bt + dy, tp + MinH);
+        return new Rectangle(l, tp, rt - l, bt - tp);
     }
 
     // The resize cursor key for a hit-test code, or null for a non-edge (caption/client) code.
