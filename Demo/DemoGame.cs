@@ -49,6 +49,10 @@ public sealed class DemoGame : WindowGame
             MenuItemDef.Item("E&xit", null, Exit),
         };
 
+        // The Vista look pairs its palette with its own art skin, so picking it (or leaving it)
+        // swaps the skin too; the plain palettes keep the Win 3.1 art skin.
+        ThemeManager.Register(VistaPng.Palette);
+
         var themes = new List<MenuItemDef>();
         foreach (var p in ThemeManager.All)
         {
@@ -59,7 +63,7 @@ public sealed class DemoGame : WindowGame
                 Checked = ThemeManager.Current == pal.Name,
                 OnClick = () =>
                 {
-                    ThemeManager.Apply(pal);
+                    ApplyTheme(pal);
                     _status.Message = "Theme: " + pal.Name;
                     RefreshThemeChecks();
                 },
@@ -85,6 +89,29 @@ public sealed class DemoGame : WindowGame
             case "open": ShowOpen(frame); break;
             case "form": ShowForm(frame); break;
             case "input": ShowInput(frame); break;
+        }
+
+        // FNAWINDOW_THEME=<palette name> starts on that theme, so FNAWINDOW_SHOT can capture a
+        // non-default skin headlessly ("vista" and "Windows Vista" both work).
+        var want = System.Environment.GetEnvironmentVariable("FNAWINDOW_THEME");
+        if (!string.IsNullOrEmpty(want))
+        {
+            var pal = ThemeManager.ByName(want) ?? (want == "vista" ? VistaPng.Palette : null);
+            if (pal != null) { ApplyTheme(pal); RefreshThemeChecks(); }
+        }
+    }
+
+    private void ApplyTheme(Palette pal)
+    {
+        if (pal.Name == VistaPng.Palette.Name)
+        {
+            VistaPng.LoadAssets(GraphicsDevice); // idempotent; Apply needs the art already loaded
+            VistaPng.Apply();
+        }
+        else
+        {
+            if (ThemeManager.Skin is VistaSkin) ThemeManager.ApplySkin(new Win31PngSkin());
+            ThemeManager.Apply(pal);
         }
     }
 

@@ -40,13 +40,13 @@ public static class WindowCaption
     public static void Draw(Win31Renderer r, Rectangle title, string text, Color bg, Color textColor,
         Rectangle sys, Rectangle min, Rectangle max, int pressed, bool maximized, BitmapFont font)
     {
-        r.Fill(title, bg);
+        var skin = ThemeManager.Skin;
+        skin.DrawCaptionFill(r, title, bg);
 
         int tx = title.X + (title.Width - font.MeasureWidth(text)) / 2;
         int ty = title.Y + (title.Height - font.LineHeight) / 2;
         r.DrawText(font, text, tx, ty, textColor);
 
-        var skin = ThemeManager.Skin;
         skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0);
         skin.DrawCaptionButton(r, min, CaptionButton.Minimize, pressed == 1);
         skin.DrawCaptionButton(r, max, maximized ? CaptionButton.Restore : CaptionButton.Maximize, pressed == 2);

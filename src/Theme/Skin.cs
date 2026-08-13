@@ -57,6 +57,13 @@ public abstract class Skin
     /// the button PNG's native size so the layout (and click area) follow the art, never stretched.</summary>
     public virtual int CaptionButtonSize(CaptionButton kind) => WindowCaption.ButtonSize;
 
+    /// <summary>Fill the caption strip behind the title text and buttons. The 3.1 look is the flat
+    /// palette color; an art skin can draw a gradient instead. <paramref name="bg"/> is the
+    /// active/inactive caption color the window chose, so a skin keys its art off
+    /// <see cref="Theme.TitleActive"/> / <see cref="Theme.TitleInactive"/> and falls back to the
+    /// flat fill for any other color a caller passes.</summary>
+    public virtual void DrawCaptionFill(Win31Renderer r, Rectangle rect, Color bg) => r.Fill(rect, bg);
+
     public virtual void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
     {
         r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
