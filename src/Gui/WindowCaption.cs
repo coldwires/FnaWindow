@@ -22,7 +22,9 @@ public static class WindowCaption
         int ms = skin.CaptionButtonSize(CaptionButton.Minimize);
         int xs = skin.CaptionButtonSize(CaptionButton.Maximize);
         int Cy(int s) => title.Y + (title.Height - s) / 2;
-        sys = new Rectangle(title.X, Cy(ss) - 1, ss, ss); // system box nudged left + 1px up
+        sys = skin.ShowSystemButton
+            ? new Rectangle(title.X, Cy(ss) - 1, ss, ss) // system box nudged left + 1px up
+            : Rectangle.Empty;                           // no slot: no hit area, no draw
         max = new Rectangle(title.Right - xs, Cy(xs), xs, xs);
         min = new Rectangle(max.X - ms, Cy(ms), ms, ms);
     }
@@ -43,11 +45,13 @@ public static class WindowCaption
         var skin = ThemeManager.Skin;
         skin.DrawCaptionFill(r, title, bg);
 
-        int tx = title.X + (title.Width - font.MeasureWidth(text)) / 2;
+        int tx = skin.CenterCaptionText
+            ? title.X + (title.Width - font.MeasureWidth(text)) / 2
+            : title.X + 8;
         int ty = title.Y + (title.Height - font.LineHeight) / 2;
         r.DrawText(font, text, tx, ty, textColor);
 
-        skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0);
+        if (sys.Width > 0) skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0);
         skin.DrawCaptionButton(r, min, CaptionButton.Minimize, pressed == 1);
         skin.DrawCaptionButton(r, max, maximized ? CaptionButton.Restore : CaptionButton.Maximize, pressed == 2);
     }

@@ -57,6 +57,13 @@ public abstract class Skin
     /// a skin whose caption ends in a shadow hairline sets 0.</summary>
     public virtual int MenuBarTuck => 1;
 
+    /// <summary>Whether captions carry the top-left system box (the 3.1 look). Off, the slot
+    /// disappears entirely: no hit area, no draw.</summary>
+    public virtual bool ShowSystemButton => true;
+
+    /// <summary>Whether the caption title centers (3.1) or left-aligns (95 onward).</summary>
+    public virtual bool CenterCaptionText => true;
+
     // -- Small glyph-bearing buttons (title caption + scrollbar) -----------
     // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
     // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.

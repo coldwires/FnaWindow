@@ -31,6 +31,8 @@ public sealed class VistaSkin : Skin
     public override int MdiChildTitleHeight => 30;
     public override int WindowFrameThickness => 6; // the ring art's opaque band
     public override int MenuBarTuck => 0;          // keep the caption's shadow hairline
+    public override bool ShowSystemButton => false;
+    public override bool CenterCaptionText => false;
 
     public override int CaptionButtonSize(CaptionButton kind)
         => VistaPng.CaptionTex(kind, false)?.Width ?? base.CaptionButtonSize(kind);
