@@ -407,7 +407,12 @@ public class WindowGame : Game
     private void Relayout()
     {
         if (WindowCornerRadius > 0 && _hwnd != IntPtr.Zero)
-            WindowShape.Apply(_hwnd, Window.ClientBounds.Width, Window.ClientBounds.Height, WindowCornerRadius);
+        {
+            // Maximized windows go square (as Windows itself does) - and the region must never
+            // be smaller than the true maximized bounds, or an edge sliver gets clipped.
+            WindowShape.Apply(_hwnd, Window.ClientBounds.Width, Window.ClientBounds.Height,
+                _maximized ? 0 : WindowCornerRadius);
+        }
 
         if (Root == null) return;
         var vp = GraphicsDevice.Viewport;
