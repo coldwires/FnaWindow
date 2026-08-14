@@ -68,6 +68,12 @@ public abstract class Skin
     /// slot disappears; 3.1 closes through the system box.</summary>
     public virtual bool ShowCloseButton => false;
 
+    /// <summary>Pixels between neighbouring caption buttons. 3.1 packs them flush.</summary>
+    public virtual int CaptionButtonGap => 0;
+
+    /// <summary>Pixels between the rightmost caption button and the title edge.</summary>
+    public virtual int CaptionRightPad => 0;
+
     // -- Small glyph-bearing buttons (title caption + scrollbar) -----------
     // A button plus its glyph. Routed through the skin (not drawn in the widget) so a skin can swap
     // the whole button for authored art; the default is the classic Win 3.1 procedural drawing.

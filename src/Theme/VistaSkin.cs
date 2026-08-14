@@ -34,6 +34,8 @@ public sealed class VistaSkin : Skin
     public override bool ShowSystemButton => false;
     public override bool CenterCaptionText => false;
     public override bool ShowCloseButton => true;
+    public override int CaptionButtonGap => 2;
+    public override int CaptionRightPad => 3;
 
     public override int CaptionButtonSize(CaptionButton kind)
         => VistaPng.CaptionTex(kind, false)?.Width ?? base.CaptionButtonSize(kind);

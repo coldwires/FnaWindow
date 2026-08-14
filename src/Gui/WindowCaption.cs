@@ -29,10 +29,12 @@ public static class WindowCaption
             ? new Rectangle(title.X, Cy(ss) - 1, ss, ss) // system box nudged left + 1px up
             : Rectangle.Empty;                           // no slot: no hit area, no draw
         int cs = skin.CaptionButtonSize(CaptionButton.Close);
-        close = skin.ShowCloseButton ? new Rectangle(title.Right - cs, Cy(cs), cs, cs) : Rectangle.Empty;
-        int right = skin.ShowCloseButton ? close.X - 2 : title.Right;
+        int gap = skin.CaptionButtonGap;
+        int edge = title.Right - skin.CaptionRightPad;
+        close = skin.ShowCloseButton ? new Rectangle(edge - cs, Cy(cs), cs, cs) : Rectangle.Empty;
+        int right = skin.ShowCloseButton ? close.X - gap : edge;
         max = new Rectangle(right - xs, Cy(xs), xs, xs);
-        min = new Rectangle(max.X - ms, Cy(ms), ms, ms);
+        min = new Rectangle(max.X - gap - ms, Cy(ms), ms, ms);
     }
 
     /// <summary>Which caption button a point is over: 0 sys, 1 min, 2 max, or -1 none. Shared so every
