@@ -22,6 +22,7 @@ public sealed class TitleBar : Widget
     private Rectangle _sysRect, _minRect, _maxRect;
     private Rectangle _closeRect;
     private int _pressed = -1; // 0=sys 1=min 2=max 3=close
+    private int _hover = -1;   // same indices, cursor only
 
     /// <summary>True where a borderless host may grab the window: the bar, minus its buttons.</summary>
     public bool IsOnDragArea(Point p)
@@ -36,6 +37,7 @@ public sealed class TitleBar : Widget
 
         if (input.LeftPressed)
             _pressed = WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect, _closeRect);
+        _hover = WindowCaption.HitButton(input.Mouse, _sysRect, _minRect, _maxRect, _closeRect);
         if (input.LeftReleased)
         {
             // Fire only if released over the same button that was pressed. Single click on the system
@@ -54,5 +56,5 @@ public sealed class TitleBar : Widget
         => WindowCaption.Draw(r, Bounds, Title,
             Active ? Theme.TitleActive : Theme.Face,
             Active ? Theme.TitleText : Theme.Text,
-            _sysRect, _minRect, _maxRect, _closeRect, _pressed, Maximized, Font ?? r.UiBoldFont);
+            _sysRect, _minRect, _maxRect, _closeRect, _pressed, _hover, Maximized, Font ?? r.UiBoldFont);
 }

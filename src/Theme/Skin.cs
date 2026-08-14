@@ -94,6 +94,11 @@ public abstract class Skin
     /// so a rounded ring would expose the child's own fill at the corners.</summary>
     public virtual void DrawChildWindowFrame(Win31Renderer r, Rectangle rect) => DrawWindowFrame(r, rect);
 
+    /// <summary>Hover-aware variant. The default ignores hover entirely - 3.1 buttons do not
+    /// react to the cursor - so only a skin that wants the effect overrides this one.</summary>
+    public virtual void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed, bool hover)
+        => DrawCaptionButton(r, rect, kind, pressed);
+
     public virtual void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
     {
         r.DrawPanel(rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);

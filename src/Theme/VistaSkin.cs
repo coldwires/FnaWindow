@@ -79,10 +79,18 @@ public sealed class VistaSkin : Skin
     }
 
     public override void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed)
+        => DrawCaptionButton(r, rect, kind, pressed, hover: false);
+
+    public override void DrawCaptionButton(Win31Renderer r, Rectangle rect, CaptionButton kind, bool pressed, bool hover)
     {
         var tex = VistaPng.CaptionTex(kind, pressed);
-        if (tex != null) r.Sb.Draw(tex, new Rectangle(rect.X, rect.Y, tex.Width, tex.Height), Color.White);
-        else base.DrawCaptionButton(r, rect, kind, pressed);
+        if (tex == null) { base.DrawCaptionButton(r, rect, kind, pressed); return; }
+        var b = new Rectangle(rect.X, rect.Y, tex.Width, tex.Height);
+        r.Sb.Draw(tex, b, Color.White);
+        // The Vista hover glow: the art overdrawn with a straight-alpha tint, which under the
+        // premultiplied batch adds brightness inside the art's own shape; red for close.
+        if (hover && !pressed)
+            r.Sb.Draw(tex, b, kind == CaptionButton.Close ? new Color(255, 70, 50, 110) : new Color(255, 255, 255, 110));
     }
 
     public override void DrawScrollButton(Win31Renderer r, Rectangle rect, ScrollArrowDir dir, bool pressed)

@@ -56,6 +56,10 @@ public static class WindowCaption
 
     public static void Draw(Win31Renderer r, Rectangle title, string text, Color bg, Color textColor,
         Rectangle sys, Rectangle min, Rectangle max, Rectangle close, int pressed, bool maximized, BitmapFont font)
+        => Draw(r, title, text, bg, textColor, sys, min, max, close, pressed, -1, maximized, font);
+
+    public static void Draw(Win31Renderer r, Rectangle title, string text, Color bg, Color textColor,
+        Rectangle sys, Rectangle min, Rectangle max, Rectangle close, int pressed, int hover, bool maximized, BitmapFont font)
     {
         var skin = ThemeManager.Skin;
         skin.DrawCaptionFill(r, title, bg);
@@ -66,9 +70,9 @@ public static class WindowCaption
         int ty = title.Y + (title.Height - font.LineHeight) / 2;
         r.DrawText(font, text, tx, ty, textColor);
 
-        if (sys.Width > 0) skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0);
-        skin.DrawCaptionButton(r, min, CaptionButton.Minimize, pressed == 1);
-        skin.DrawCaptionButton(r, max, maximized ? CaptionButton.Restore : CaptionButton.Maximize, pressed == 2);
-        if (close.Width > 0) skin.DrawCaptionButton(r, close, CaptionButton.Close, pressed == 3);
+        if (sys.Width > 0) skin.DrawCaptionButton(r, sys, CaptionButton.System, pressed == 0, hover == 0);
+        skin.DrawCaptionButton(r, min, CaptionButton.Minimize, pressed == 1, hover == 1);
+        skin.DrawCaptionButton(r, max, maximized ? CaptionButton.Restore : CaptionButton.Maximize, pressed == 2, hover == 2);
+        if (close.Width > 0) skin.DrawCaptionButton(r, close, CaptionButton.Close, pressed == 3, hover == 3);
     }
 }
