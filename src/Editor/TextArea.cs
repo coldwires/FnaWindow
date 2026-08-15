@@ -127,6 +127,15 @@ public class TextArea : Widget
 
     // Every visual row in the buffer, in order. ScrollLine indexes THIS list, not the line list.
     private readonly List<VisRow> _rows = new();
+
+    // -- Folding -------------------------------------------------------------
+    // Indentation folds: a collapsed region keeps its header line visible and hides
+    // [Start+1..End]. Hidden lines simply contribute no rows, so caret math, scrolling and
+    // drawing need no special cases beyond "the caret must never sit on a hidden line".
+    // Off by default: only editors that opt in (FoldingEnabled) pay the gutter.
+    public bool FoldingEnabled;
+    private const int FoldGutterW = 13;
+    private readonly List<(int Start, int End)> _folds = new();
     // _firstRow[i] is the index of line i's first row; _firstRow[LineCount] == _rows.Count.
     private int[] _firstRow = { 0, 0 };
     private int _wrapWidth;                // the column width _rows was built for (0 = unwrapped)
@@ -178,7 +187,105 @@ public class TextArea : Widget
 
     /// <summary>Called after every edit. The base rebuilds the visual rows and the scroll extent;
     /// override (and call base) to update any per-line state of your own.</summary>
-    protected virtual void OnBufferChanged(TextChange change) => BuildRows();
+    protected virtual void OnBufferChanged(TextChange change)
+    {
+        AdjustFolds(change);
+        BuildRows();
+    }
+
+    // Remap collapsed regions across an edit: before it, unchanged; after it, shifted by the
+    // line delta; touching it, dropped (safe over clever - the region reappears expanded).
+    private void AdjustFolds(TextChange c)
+    {
+        if (_folds.Count == 0) return;
+        if (c.NewText == null && c.Start == default && c.End == default) { _folds.Clear(); return; }
+        int removed = c.End.Line - c.Start.Line;
+        int added = 0;
+        string nt = c.NewText ?? "";
+        foreach (char ch in nt) if (ch == '\n') added++;
+        int delta = added - removed;
+        for (int i = _folds.Count - 1; i >= 0; i--)
+        {
+            var f = _folds[i];
+            if (f.End < c.Start.Line) continue;
+            else if (f.Start > c.End.Line) _folds[i] = (f.Start + delta, f.End + delta);
+            else _folds.RemoveAt(i);
+        }
+    }
+
+    private bool LineHidden(int line)
+    {
+        foreach (var f in _folds)
+            if (line > f.Start && line <= f.End) return true;
+        return false;
+    }
+
+    /// <summary>The indentation fold headed by <paramref name="line"/>: it runs through every
+    /// following line indented deeper (blank lines ride along inside). False when nothing
+    /// deeper follows, i.e. the line heads no block.</summary>
+    private bool FoldRangeAt(int line, out int end)
+    {
+        end = line;
+        if (line < 0 || line >= Buf.LineCount) return false;
+        int baseIndent = LineIndentOf(Buf.Line(line));
+        if (baseIndent < 0) return false; // a blank line heads nothing
+        int last = line;
+        for (int i = line + 1; i < Buf.LineCount; i++)
+        {
+            int ind = LineIndentOf(Buf.Line(i));
+            if (ind < 0) continue;            // blank: inside if deeper content follows
+            if (ind <= baseIndent) break;
+            last = i;
+        }
+        end = last;
+        return last > line;
+    }
+
+    // Leading whitespace width, or -1 for a blank line.
+    private static int LineIndentOf(string s)
+    {
+        int ns = 0;
+        while (ns < s.Length && (s[ns] == ' ' || s[ns] == '\t')) ns++;
+        return ns >= s.Length ? -1 : ns;
+    }
+
+    private bool IsCollapsed(int line)
+    {
+        foreach (var f in _folds) if (f.Start == line) return true;
+        return false;
+    }
+
+    /// <summary>Collapse or expand the fold headed by <paramref name="line"/>.</summary>
+    public void ToggleFoldAt(int line)
+    {
+        for (int i = 0; i < _folds.Count; i++)
+            if (_folds[i].Start == line)
+            {
+                _folds.RemoveAt(i);
+                BuildRows();
+                Root()?.RequestRedraw();
+                return;
+            }
+        if (!FoldRangeAt(line, out int end)) return;
+        // A caret inside the region would vanish with it; it steps up to the header.
+        if (_caret.Line > line && _caret.Line <= end) { _caret = new Position(line, 0); _anchor = _caret; }
+        _folds.Add((line, end));
+        BuildRows();
+        Root()?.RequestRedraw();
+    }
+
+    // The caret must never rest on a hidden line (arrow keys and searches can walk into one):
+    // the fold hiding it pops open instead, which is what every folding editor does.
+    private void RevealCaretLine()
+    {
+        if (_folds.Count == 0 || !LineHidden(_caret.Line)) return;
+        for (int i = _folds.Count - 1; i >= 0; i--)
+            if (_caret.Line > _folds[i].Start && _caret.Line <= _folds[i].End)
+                _folds.RemoveAt(i);
+        BuildRows();
+        Root()?.RequestRedraw();
+    }
+
 
     /// <summary>Take the mouse before the caret does; return true to consume this frame's mouse.</summary>
     protected virtual bool MouseIntercept(InputState input) => false;
@@ -211,6 +318,7 @@ public class TextArea : Widget
         for (int i = 0; i < n; i++)
         {
             _firstRow[i] = _rows.Count;
+            if (LineHidden(i)) continue;    // folded away: no rows
             string line = Buf.Line(i);
             _maxLineLen = Math.Max(_maxLineLen, line.Length + 1);
 
@@ -243,6 +351,7 @@ public class TextArea : Widget
     {
         int line = Math.Clamp(p.Line, 0, Buf.LineCount - 1);
         int first = _firstRow[line], last = _firstRow[line + 1] - 1;
+        if (last < first) return Math.Max(0, first - 1); // hidden line: the row just above it
         for (int i = first; i < last; i++)
             if (p.Col < _rows[i].End) return i;
         return last;
@@ -290,7 +399,7 @@ public class TextArea : Widget
         VBar.Layout(); HBar.Layout();
 
         TextRect = new Rectangle(inner.X, inner.Y, inner.Width - rightStrip, inner.Height - bottomStrip);
-        OriginX = TextRect.X + Theme.EditorPaddingLeft;
+        OriginX = TextRect.X + Theme.EditorPaddingLeft + (FoldingEnabled ? FoldGutterW : 0);
         OriginY = TextRect.Y + Theme.EditorPaddingTop;
         VisLines = Math.Max(1, (TextRect.Bottom - OriginY) / CellH);
         VisCols = Math.Max(1, (TextRect.Right - OriginX) / CellW);
@@ -315,6 +424,7 @@ public class TextArea : Widget
         if (_blink >= Theme.CaretBlinkMs) { _blink -= Theme.CaretBlinkMs; _blinkOn = !_blinkOn; }
 
         if (InputBlocked) return;
+        if (FoldingEnabled) RevealCaretLine();
         if (!MouseBlocked) HandleMouse(input);
     }
 
@@ -414,6 +524,19 @@ public class TextArea : Widget
         bool inText = TextRect.Contains(m);
 
         if (MouseIntercept(input)) return;
+
+        // The fold gutter: a click on a marker toggles its region and does nothing else.
+        if (FoldingEnabled && input.LeftPressed && inText && m.X < OriginX - 2
+            && !VBar.Bounds.Contains(m) && !(HBar.Visible && HBar.Bounds.Contains(m)))
+        {
+            int gri = Math.Clamp(ScrollLine + (m.Y - OriginY) / CellH, 0, Math.Max(0, _rows.Count - 1));
+            if (_rows.Count > 0)
+            {
+                var grow = _rows[gri];
+                if (grow.Start == 0) ToggleFoldAt(grow.Line);
+            }
+            return;
+        }
 
         if (input.LeftPressed && inText && !VBar.Bounds.Contains(m) && !(HBar.Visible && HBar.Bounds.Contains(m)))
         {
@@ -862,6 +985,30 @@ public class TextArea : Widget
 
     // -- Draw --------------------------------------------------------------
 
+    // The gutter marker: a 9px box, minus when expanded and foldable, plus when collapsed;
+    // a collapsed header also gets a dim ".." past its end so the hidden body reads as such.
+    private void DrawFoldMarker(Win31Renderer r, int line, int y)
+    {
+        bool collapsed = IsCollapsed(line);
+        if (!collapsed && !FoldRangeAt(line, out _)) return;
+        var border = new Color(128, 128, 128);
+        int bx = TextRect.X + Theme.EditorPaddingLeft + 1, cy = y + CellH / 2;
+        r.Fill(new Rectangle(bx, cy - 4, 9, 9), Color.White);
+        r.Fill(bx, cy - 4, 9, 1, border);
+        r.Fill(bx, cy + 4, 9, 1, border);
+        r.Fill(bx, cy - 3, 1, 7, border);
+        r.Fill(bx + 8, cy - 3, 1, 7, border);
+        r.Fill(bx + 2, cy, 5, 1, Color.Black);
+        if (collapsed)
+        {
+            r.Fill(bx + 4, cy - 2, 1, 5, Color.Black);
+            var font = FontOverride ?? r.EditorFont;
+            int hx = OriginX + (Buf.Line(line).Length - ScrollCol) * CellW + 8;
+            if (hx < TextRect.Right - 12)
+                r.DrawText(font, "..", hx, y + (CellH - font.LineHeight) / 2, border);
+        }
+    }
+
     public override void Draw(Win31Renderer r)
     {
         if (DrawWell) r.DrawPanel(Well, BevelStyle.SunkenThick, Theme.WindowBg);
@@ -891,6 +1038,8 @@ public class TextArea : Widget
             // every row of that line, so "the line you are editing" still reads as one block.
             if (HighlightCurrentLine && row.Line == _caret.Line && !hasSel)
                 r.Fill(TextRect.X, y, TextRect.Width, CellH, Theme.EditorCurrentLine);
+
+            if (FoldingEnabled && row.Start == 0) DrawFoldMarker(r, row.Line, y);
 
             if (coloredLine != row.Line) { colors = ColorLine(row.Line, line); coloredLine = row.Line; }
 
