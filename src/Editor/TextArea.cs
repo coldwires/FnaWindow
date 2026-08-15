@@ -139,6 +139,19 @@ public class TextArea : Widget
     /// <summary>The line-number column (Ctrl+L toggles it). Off by default, so nothing changes
     /// for an app that never asks. Wrapped continuation rows show no number.</summary>
     public bool ShowLineNumbers;
+
+    /// <summary>Optional one-line annotation shown as a phantom row ABOVE a buffer line (the
+    /// Rider-style "override of X" card). Null for no card. The row is synthetic: it scrolls
+    /// with the text but has no buffer presence - the caret skips it, a click on it lands on
+    /// the line it annotates. Call <see cref="InvalidateAnnotations"/> when answers change.</summary>
+    public Func<int, string?>? LineAnnotation;
+
+    /// <summary>Re-asks <see cref="LineAnnotation"/> for every line (the source changed).</summary>
+    public void InvalidateAnnotations()
+    {
+        BuildRows();
+        Root()?.RequestRedraw();
+    }
     private int _numDigits = 3; // column width in digits, captured at layout
     private readonly List<(int Start, int End)> _folds = new();
     // _firstRow[i] is the index of line i's first row; _firstRow[LineCount] == _rows.Count.
@@ -329,7 +342,9 @@ public class TextArea : Widget
 
         for (int i = 0; i < n; i++)
         {
-            _firstRow[i] = _rows.Count;
+            if (!LineHidden(i) && LineAnnotation?.Invoke(i) != null)
+                _rows.Add(new VisRow(i, -1, -1)); // the annotation card rides above the line
+            _firstRow[i] = _rows.Count;           // ...and stays out of the position math
             if (LineHidden(i)) continue;    // folded away: no rows
             string line = Buf.Line(i);
             _maxLineLen = Math.Max(_maxLineLen, line.Length + 1);
@@ -896,6 +911,8 @@ public class TextArea : Widget
     {
         _verticalMove = true;
         int ri = Math.Clamp(RowIndexOf(_caret) + dRows, 0, _rows.Count - 1);
+        while (ri > 0 && ri < _rows.Count - 1 && _rows[ri].Start < 0) ri += Math.Sign(dRows);
+        while (ri < _rows.Count - 1 && _rows[ri].Start < 0) ri++; // an annotation at the top edge
         var row = _rows[ri];
         // On a non-final visual row, End is the wrap point, which RowIndexOf assigns to the NEXT row -
         // landing the caret there would put it a row below the one this move chose. Cap at End-1 so it
@@ -976,6 +993,7 @@ public class TextArea : Widget
         int ri = Math.Clamp(ScrollLine + (m.Y - OriginY) / CellH, 0, _rows.Count - 1);
         if (m.Y < OriginY) ri = Math.Clamp(ScrollLine, 0, _rows.Count - 1);
         var row = _rows[ri];
+        if (row.Start < 0) return new Position(row.Line, 0); // annotation card: the line below
         int rel = (int)Math.Round((double)(m.X - OriginX) / CellW);
         int col = Math.Clamp(row.Start + ScrollCol + Math.Max(0, rel), row.Start, row.End);
         return new Position(row.Line, col);
@@ -1039,6 +1057,28 @@ public class TextArea : Widget
         }
     }
 
+    // The annotation card: a quiet boxed label at the line's own indent, in the UI face so it
+    // reads as chrome speaking about the code rather than code itself.
+    private void DrawAnnotationRow(Win31Renderer r, int line, int y)
+    {
+        string? label = LineAnnotation?.Invoke(line);
+        if (label == null) return;
+        var font = r.UiFont;
+        string s = Buf.Line(Math.Clamp(line, 0, Buf.LineCount - 1));
+        int ind = 0;
+        while (ind < s.Length && (s[ind] == ' ' || s[ind] == '\t')) ind++;
+        int x = OriginX + (ind - ScrollCol) * CellW;
+        int w = font.MeasureWidth(label) + 10;
+        var box = new Rectangle(x, y + 1, w, CellH - 2);
+        if (box.Right < TextRect.X || box.X > TextRect.Right) return;
+        r.Fill(box, Theme.Face);
+        r.Fill(box.X, box.Y, box.Width, 1, Theme.TextDisabled);
+        r.Fill(box.X, box.Bottom - 1, box.Width, 1, Theme.TextDisabled);
+        r.Fill(box.X, box.Y + 1, 1, box.Height - 2, Theme.TextDisabled);
+        r.Fill(box.Right - 1, box.Y + 1, 1, box.Height - 2, Theme.TextDisabled);
+        r.DrawText(font, label, box.X + 5, box.Y + (box.Height - font.LineHeight) / 2, Theme.TextDisabled);
+    }
+
     public override void Draw(Win31Renderer r)
     {
         if (DrawWell) r.DrawPanel(Well, BevelStyle.SunkenThick, Theme.WindowBg);
@@ -1059,8 +1099,9 @@ public class TextArea : Widget
             int ri = ScrollLine + screenRow;
             if (ri >= _rows.Count) break;
             var row = _rows[ri];
-            string line = Buf.Line(row.Line);
             int y = OriginY + screenRow * CellH;
+            if (row.Start < 0) { DrawAnnotationRow(r, row.Line, y); continue; }
+            string line = Buf.Line(row.Line);
 
             DrawLineBackground(r, row.Line, y);
 
