@@ -166,6 +166,17 @@ public class WindowGame : Game
 
     protected virtual bool UseSystemFonts => false;
 
+    /// <summary>The faces UseSystemFonts rasterises. Defaults are the 3.1 set: raster MS Sans
+    /// Serif, 13px UI, 16px bold chrome, hard 1-bit edges. A differently-skinned app retunes
+    /// these instead of re-implementing the swap. Heights are GDI cell heights in pixels
+    /// (17px is 13pt at 96dpi).</summary>
+    protected virtual string SystemUiFamily => "MS Sans Serif";
+    protected virtual int SystemUiHeight => 13;
+    protected virtual bool SystemUiAntialiased => false;
+    protected virtual string SystemChromeFamily => SystemUiFamily;
+    protected virtual int SystemChromeHeight => 16;
+    protected virtual bool SystemChromeBold => true;
+
     private void ApplySystemFonts()
     {
         if (!UseSystemFonts || !BitmapFont.Supported) return;
@@ -175,15 +186,17 @@ public class WindowGame : Game
         // pixels short of the cell, so it is reported at 15 and nudged down one to sit centred.
         Swap("Courier", 13, false, lineHeight: Theme.EditorCellH, yOffset: 1, f => EditorFont = f);
 
-        Swap("MS Sans Serif", 13, false, 0, 0, f => UiFont = f);
-        Swap("MS Sans Serif", 13, true,  0, 0, f => UiBoldFont = f);
-        // The chrome trick, kept: the caption and menu bar take the same face a size up and bold.
-        Swap("MS Sans Serif", 16, true,  0, 0, f => ChromeFont = f);
+        Swap(SystemUiFamily, SystemUiHeight, false, 0, 0, f => UiFont = f);
+        Swap(SystemUiFamily, SystemUiHeight, true,  0, 0, f => UiBoldFont = f);
+        // The chrome trick, kept for 3.1: the caption and menu bar take the same face a size up
+        // and bold by default; the SystemChrome* virtuals retune it per app.
+        Swap(SystemChromeFamily, SystemChromeHeight, SystemChromeBold, 0, 0, f => ChromeFont = f);
 
         void Swap(string family, int px, bool bold, int lineHeight, int yOffset, Action<BitmapFont> assign)
         {
             if (!BitmapFont.HasFamily(family)) return;   // GDI substitutes silently; do not let it
-            var f = BitmapFont.FromSystemFont(GraphicsDevice, family, px, bold, lineHeight, yOffset);
+            var f = BitmapFont.FromSystemFont(GraphicsDevice, family, px, bold, lineHeight, yOffset,
+                antialiased: SystemUiAntialiased);
             if (f != null) assign(f);
         }
     }
