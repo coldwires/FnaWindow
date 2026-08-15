@@ -135,6 +135,11 @@ public class TextArea : Widget
     // Off by default: only editors that opt in (FoldingEnabled) pay the gutter.
     public bool FoldingEnabled;
     private const int FoldGutterW = 13;
+
+    /// <summary>The line-number column (Ctrl+L toggles it). Off by default, so nothing changes
+    /// for an app that never asks. Wrapped continuation rows show no number.</summary>
+    public bool ShowLineNumbers;
+    private int _numDigits = 3; // column width in digits, captured at layout
     private readonly List<(int Start, int End)> _folds = new();
     // _firstRow[i] is the index of line i's first row; _firstRow[LineCount] == _rows.Count.
     private int[] _firstRow = { 0, 0 };
@@ -191,6 +196,8 @@ public class TextArea : Widget
     {
         AdjustFolds(change);
         BuildRows();
+        // Crossing a digit boundary (999 -> 1000) widens the number column.
+        if (ShowLineNumbers && Buf.LineCount.ToString().Length != _numDigits) Layout();
     }
 
     // Remap collapsed regions across an edit: before it, unchanged; after it, shifted by the
@@ -399,7 +406,10 @@ public class TextArea : Widget
         VBar.Layout(); HBar.Layout();
 
         TextRect = new Rectangle(inner.X, inner.Y, inner.Width - rightStrip, inner.Height - bottomStrip);
-        OriginX = TextRect.X + Theme.EditorPaddingLeft + (FoldingEnabled ? FoldGutterW : 0);
+        _numDigits = Math.Max(3, Buf.LineCount.ToString().Length);
+        OriginX = TextRect.X + Theme.EditorPaddingLeft
+            + (ShowLineNumbers ? (_numDigits + 1) * CellW : 0)
+            + (FoldingEnabled ? FoldGutterW : 0);
         OriginY = TextRect.Y + Theme.EditorPaddingTop;
         VisLines = Math.Max(1, (TextRect.Bottom - OriginY) / CellH);
         VisCols = Math.Max(1, (TextRect.Right - OriginX) / CellW);
@@ -526,7 +536,8 @@ public class TextArea : Widget
         if (MouseIntercept(input)) return;
 
         // The fold gutter: a click on a marker toggles its region and does nothing else.
-        if (FoldingEnabled && input.LeftPressed && inText && m.X < OriginX - 2
+        if (FoldingEnabled && input.LeftPressed && inText
+            && m.X >= OriginX - FoldGutterW && m.X < OriginX - 2
             && !VBar.Bounds.Contains(m) && !(HBar.Visible && HBar.Bounds.Contains(m)))
         {
             int gri = Math.Clamp(ScrollLine + (m.Y - OriginY) / CellH, 0, Math.Max(0, _rows.Count - 1));
@@ -601,6 +612,7 @@ public class TextArea : Widget
 
         if (ctrl)
         {
+            if (input.Pressed(Keys.L)) { ShowLineNumbers = !ShowLineNumbers; Layout(); Root()?.RequestRedraw(); return; }
             if (input.Pressed(Keys.A)) { SelectAll(); return; }
             if (input.Pressed(Keys.C)) { Copy(); return; }
             if (input.Pressed(Keys.X)) { Cut(); return; }
@@ -992,7 +1004,7 @@ public class TextArea : Widget
         bool collapsed = IsCollapsed(line);
         if (!collapsed && !FoldRangeAt(line, out _)) return;
         var border = new Color(128, 128, 128);
-        int bx = TextRect.X + Theme.EditorPaddingLeft + 1, cy = y + CellH / 2;
+        int bx = OriginX - FoldGutterW + 1, cy = y + CellH / 2;
         r.Fill(new Rectangle(bx, cy - 4, 9, 9), Color.White);
         r.Fill(bx, cy - 4, 9, 1, border);
         r.Fill(bx, cy + 4, 9, 1, border);
@@ -1039,6 +1051,13 @@ public class TextArea : Widget
             if (HighlightCurrentLine && row.Line == _caret.Line && !hasSel)
                 r.Fill(TextRect.X, y, TextRect.Width, CellH, Theme.EditorCurrentLine);
 
+            if (ShowLineNumbers && row.Start == 0)
+            {
+                string num = (row.Line + 1).ToString();
+                r.DrawText(font, num,
+                    TextRect.X + Theme.EditorPaddingLeft + (_numDigits - num.Length) * CellW,
+                    y, new Color(128, 128, 128));
+            }
             if (FoldingEnabled && row.Start == 0) DrawFoldMarker(r, row.Line, y);
 
             if (coloredLine != row.Line) { colors = ColorLine(row.Line, line); coloredLine = row.Line; }
