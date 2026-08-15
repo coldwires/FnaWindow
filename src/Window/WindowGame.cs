@@ -237,6 +237,7 @@ public class WindowGame : Game
         {
             ("arrow", 0, 0), ("ibeam", 15, 16), ("cross", 15, 16), ("wait", 16, 16),
             ("sizewe", 17, 8), ("sizens", 14, 10), ("sizenwse", 7, 6), ("sizenesw", 24, 6),
+            ("hand", 6, 0),
         };
         string dir = Path.Combine(AppContext.BaseDirectory, "Content", "cursors");
         bool any = false;

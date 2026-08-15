@@ -384,7 +384,20 @@ public class TextArea : Widget
 
     /// <summary>I-beam over the text region (not the scrollbars), else defer to parent/default.
     /// Mid-pan the four-arrow move cursor takes over, held through the drag via CursorCapture.</summary>
-    public override string? CursorKey(Point p) => Panning ? "size" : TextRect.Contains(p) ? "ibeam" : null;
+    public override string? CursorKey(Point p) => Panning ? "size"
+        : FoldingEnabled && TextRect.Contains(p) && p.X >= OriginX - FoldGutterW && p.X < OriginX - 2 && FoldHeaderAt(p) ? "hand"
+        : TextRect.Contains(p) ? "ibeam" : null;
+
+    // Whether the gutter row under the point carries a fold marker (so the hand only shows
+    // where a click would actually do something).
+    private bool FoldHeaderAt(Point p)
+    {
+        if (_rows.Count == 0 || p.Y < OriginY) return false;
+        int ri = ScrollLine + (p.Y - OriginY) / CellH;
+        if (ri < 0 || ri >= _rows.Count) return false;
+        var row = _rows[ri];
+        return row.Start == 0 && (IsCollapsed(row.Line) || FoldRangeAt(row.Line, out _));
+    }
 
     public override void Layout()
     {
