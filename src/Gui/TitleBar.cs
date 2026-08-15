@@ -26,7 +26,8 @@ public sealed class TitleBar : Widget
 
     /// <summary>True where a borderless host may grab the window: the bar, minus its buttons.</summary>
     public bool IsOnDragArea(Point p)
-        => Bounds.Contains(p) && !_sysRect.Contains(p) && !_minRect.Contains(p) && !_maxRect.Contains(p);
+        => Bounds.Contains(p) && !_sysRect.Contains(p) && !_minRect.Contains(p) && !_maxRect.Contains(p)
+            && !_closeRect.Contains(p); // the X is a button, not a grab handle
 
     public override void Layout()
         => WindowCaption.LayoutButtons(Bounds, out _sysRect, out _minRect, out _maxRect, out _closeRect);
