@@ -550,14 +550,19 @@ public class WindowGame : Game
         // mirroring the maximize gestures that work while restored.
         if (!_maximized)
         {
-            const int E = 4; // resize border
+            // The border band tracks the skin's frame thickness; corners reach C px along each
+            // edge (as Windows itself does), because a band-by-band corner is a 4x4 target
+            // nobody can hit.
+            int E = ThemeManager.Skin.WindowFrameThickness;
+            const int C = 20;
             var vp = GraphicsDevice.Viewport;
             int w = vp.Width, h = vp.Height;
             bool l = cx < E, r = cx >= w - E, tp = cy < E, bt = cy >= h - E;
-            if (tp && l) return WindowChrome.HTTOPLEFT;
-            if (tp && r) return WindowChrome.HTTOPRIGHT;
-            if (bt && l) return WindowChrome.HTBOTTOMLEFT;
-            if (bt && r) return WindowChrome.HTBOTTOMRIGHT;
+            bool lc = cx < C, rc = cx >= w - C, tc = cy < C, bc = cy >= h - C;
+            if (tp && lc || l && tc) return WindowChrome.HTTOPLEFT;
+            if (tp && rc || r && tc) return WindowChrome.HTTOPRIGHT;
+            if (bt && lc || l && bc) return WindowChrome.HTBOTTOMLEFT;
+            if (bt && rc || r && bc) return WindowChrome.HTBOTTOMRIGHT;
             if (l) return WindowChrome.HTLEFT;
             if (r) return WindowChrome.HTRIGHT;
             if (tp) return WindowChrome.HTTOP;
