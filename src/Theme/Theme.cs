@@ -32,6 +32,9 @@ public static class Theme
     public static Color SyntaxTypeName = Rgb(0x00, 0x00, 0x80); // resolved type names
     public static Color SyntaxString   = Rgb(0x80, 0x00, 0x00); // string/char literals
     public static Color SyntaxNumber   = Rgb(0x00, 0x00, 0x00); // numeric literals
+    public static Color SyntaxFunction = Rgb(0x00, 0x00, 0x00); // proc/function call names
+    public static Color SyntaxMacro    = Rgb(0x00, 0x80, 0x00); // macro names, at use sites too
+    public static Color SyntaxDirective = Rgb(0x00, 0x80, 0x00); // preprocessor directives
     public static Color SyntaxComment  = Rgb(0x80, 0x80, 0x80); // comments
 
     /// <summary>The faint band behind the caret's line in a text area. Derived from the palette (a
