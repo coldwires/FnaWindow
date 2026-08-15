@@ -31,6 +31,7 @@ public static class Theme
     public static Color SyntaxKeyword  = Rgb(0x00, 0x80, 0x00); // C# keywords
     public static Color SyntaxTypeName = Rgb(0x00, 0x00, 0x80); // resolved type names
     public static Color SyntaxString   = Rgb(0x80, 0x00, 0x00); // string/char literals
+    public static Color SyntaxNumber   = Rgb(0x00, 0x00, 0x00); // numeric literals
     public static Color SyntaxComment  = Rgb(0x80, 0x80, 0x80); // comments
 
     /// <summary>The faint band behind the caret's line in a text area. Derived from the palette (a

@@ -17,7 +17,8 @@ public sealed record Palette(
     Color WindowBg, Color Text, Color TextDisabled, Color Desktop,
     Color? SyntaxKeyword = null, Color? SyntaxTypeName = null,
     Color? SyntaxString = null, Color? SyntaxComment = null,
-    Color? SquiggleError = null, Color? SquiggleWarn = null);
+    Color? SquiggleError = null, Color? SquiggleWarn = null,
+    Color? SyntaxNumber = null);
 
 /// <summary>
 /// Swaps the whole UI palette at runtime by writing into <see cref="Theme"/>'s mutable static
@@ -114,6 +115,9 @@ public static class ThemeManager
         if (p.SyntaxComment is { } c) Theme.SyntaxComment = c;
         if (p.SquiggleError is { } e) Theme.SquiggleError = e;
         if (p.SquiggleWarn is { } w) Theme.SquiggleWarn = w;
+        // Unlike the other code colors, an unset number color FOLLOWS the palette's text color:
+        // a stale red from the previous palette could be unreadable on this one's background.
+        Theme.SyntaxNumber = p.SyntaxNumber ?? p.Text;
 
         Current = p.Name;
         Changed?.Invoke();
