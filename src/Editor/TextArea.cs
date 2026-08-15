@@ -331,6 +331,8 @@ public class TextArea : Widget
     private bool _panning, _panMoved;
     private Point _panAnchor;
     private int _panLine, _panCol;
+    private Point? _panWarp;    // a cursor warp was issued; waiting for the OS to report it
+    private int _panWarpGrace;  // frames left before giving up on the warp and re-anchoring
 
     /// <summary>True while a middle-drag is actually panning (a still press does not count).</summary>
     protected bool Panning => _panning && _panMoved;
@@ -355,11 +357,34 @@ public class TextArea : Widget
                 _panMoved = true;
                 if (Root() is { } rt) rt.CursorCapture = this;
             }
-            if (_panMoved)
+            if (_panMoved && _panWarp is { } wt)
+            {
+                // A warp was issued but SetCursorPos lands asynchronously: for a frame or two
+                // the OS still reports pre-warp positions, and a delta computed from those
+                // would jolt the content. Hold the view until the cursor is seen near the
+                // target (or the grace runs out), then re-anchor the pan from scratch - a
+                // fresh anchor cannot jump by construction.
+                if (Math.Abs(m.X - wt.X) + Math.Abs(m.Y - wt.Y) <= 12 || --_panWarpGrace <= 0)
+                {
+                    _panWarp = null;
+                    _panAnchor = m;
+                    _panLine = ScrollLine;
+                    _panCol = ScrollCol;
+                }
+            }
+            else if (_panMoved)
             {
                 ScrollLine = Math.Clamp(_panLine - dy / CellH, 0, VBar.MaxValue);
                 if (HBar.Visible) ScrollCol = Math.Clamp(_panCol - dx / CellW, 0, HBar.MaxValue);
                 Root()?.RequestRedraw();
+
+                // Continuous grab: at the window edge the cursor wraps to the opposite side
+                // and the pan re-anchors once the warp lands - it never runs out of desk.
+                if (Root() is { } rw && MouseWarp.WrapInClient(m, rw.Bounds, out var warped))
+                {
+                    _panWarp = warped;
+                    _panWarpGrace = 6;
+                }
             }
         }
         else // released (or focus lost with the button up): end the pan
