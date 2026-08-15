@@ -17,6 +17,9 @@ public sealed class PushButton
     /// <summary>Drawn sunken right now: the press started here and the mouse is still on it.</summary>
     public bool Pressed { get; private set; }
 
+    /// <summary>The cursor is over the button. Skins that react to hover read it via Draw.</summary>
+    public bool Hover { get; private set; }
+
     private bool _armed;   // the press began on this button
 
     public PushButton(string label = "") => Label = label;
@@ -29,6 +32,7 @@ public sealed class PushButton
     public bool Update(InputState input)
     {
         bool over = Bounds.Contains(input.Mouse);
+        Hover = over;
 
         if (input.LeftPressed && over) _armed = true;
 
@@ -45,11 +49,11 @@ public sealed class PushButton
     }
 
     /// <summary>Cancel any held state (the owner closing, losing input, and so on).</summary>
-    public void Reset() { _armed = false; Pressed = false; }
+    public void Reset() { _armed = false; Pressed = false; Hover = false; }
 
     public void Draw(Win31Renderer r)
     {
-        ThemeManager.Skin.DrawButton(r, Bounds, Pressed);
+        ThemeManager.Skin.DrawButton(r, Bounds, Pressed, Hover);
         if (Label.Length == 0) return;
 
         int off = Pressed ? 1 : 0;   // label rides down with the button

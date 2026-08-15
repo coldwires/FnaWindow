@@ -156,6 +156,11 @@ public abstract class Skin
 
     /// <summary>A push button's background + bevel (e.g. toolbar buttons). Default is the classic
     /// raised/sunken thin bevel; an art skin can supply authored button art.</summary>
+    /// <summary>Hover-aware variant. The default ignores hover - 3.1 buttons do not react
+    /// to the cursor - so only a skin that wants the effect overrides this one.</summary>
+    public virtual void DrawButton(Win31Renderer r, Rectangle rect, bool pressed, bool hover)
+        => DrawButton(r, rect, pressed);
+
     public virtual void DrawButton(Win31Renderer r, Rectangle rect, bool pressed)
         => DrawPanel(r, rect, pressed ? BevelStyle.SunkenThin : BevelStyle.RaisedThin, Theme.Face);
 

@@ -92,9 +92,14 @@ public sealed class InputDialog : Widget
         }
         else
         {
-            _ok.Bounds = new Rectangle(x + W - (AltLabel != null ? 248 : 168), y + buttonsTop, 72, 22);
-            _alt.Bounds = AltLabel != null ? new Rectangle(x + W - 168, y + buttonsTop, 72, 22) : Rectangle.Empty;
-            _cancel.Bounds = new Rectangle(x + W - 88, y + buttonsTop, 72, 22);
+            // Right-aligned row, 12px between buttons; the third slot runs wider so a label
+            // like "Don't Save" is not crammed into the OK/Cancel width.
+            const int gap = 12, btnW = 72, altW = 88;
+            _cancel.Bounds = new Rectangle(x + W - 16 - btnW, y + buttonsTop, btnW, 22);
+            _alt.Bounds = AltLabel != null
+                ? new Rectangle(_cancel.Bounds.X - gap - altW, y + buttonsTop, altW, 22)
+                : Rectangle.Empty;
+            _ok.Bounds = new Rectangle((AltLabel != null ? _alt.Bounds.X : _cancel.Bounds.X) - gap - btnW, y + buttonsTop, btnW, 22);
         }
     }
 

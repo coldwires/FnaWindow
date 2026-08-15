@@ -130,6 +130,9 @@ public sealed class VistaSkin : Skin
     }
 
     public override void DrawButton(Win31Renderer r, Rectangle rect, bool pressed)
+        => DrawButton(r, rect, pressed, hover: false);
+
+    public override void DrawButton(Win31Renderer r, Rectangle rect, bool pressed, bool hover)
     {
         var tex = VistaPng.ButtonTex(pressed);
         if (tex == null) { base.DrawButton(r, rect, pressed); return; }
@@ -137,6 +140,16 @@ public sealed class VistaSkin : Skin
         // the identical 1px/3px contract so both skins share the slicing constants.
         if (pressed) Win31Png.NineSliceFull(r.Sb, tex, Win31Png.BtnThick, Win31Png.BtnThick, Win31Png.BtnThin, Win31Png.BtnThin, rect);
         else Win31Png.NineSliceFull(r.Sb, tex, Win31Png.BtnThin, Win31Png.BtnThin, Win31Png.BtnThick, Win31Png.BtnThick, rect);
+        // The hover lift: straight-alpha white inside the border reads as the Vista glass glow
+        // under the premultiplied batch.
+        if (hover && !pressed)
+        {
+            // A premultiplied wash, not straight-alpha white: the face IS white, and white over
+            // white is invisible. This blends the face toward the Vista hover blue instead.
+            var inner = rect;
+            inner.Inflate(-1, -1); // the art's border is a symmetric 1px ring
+            if (inner.Width > 0 && inner.Height > 0) r.Fill(inner, new Color(120, 175, 230) * 0.35f);
+        }
     }
 
     public override void DrawMenuCheck(Win31Renderer r, int cx, int cy, Color color)
