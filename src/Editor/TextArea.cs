@@ -671,7 +671,7 @@ public class TextArea : Widget
         if (ReadOnly) return;
 
         if (input.Pressed(Keys.Enter)) { EnterKey(); return; }
-        if (input.Pressed(Keys.Tab))
+        if (input.Pressed(Keys.Tab) && !ctrl) // Ctrl+Tab belongs to window cycling, not indent
         {
             if (shift) OutdentLines();
             else if (HasSel) IndentLines();
