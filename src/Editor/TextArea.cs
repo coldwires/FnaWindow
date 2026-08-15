@@ -227,13 +227,18 @@ public class TextArea : Widget
         return false;
     }
 
-    /// <summary>The indentation fold headed by <paramref name="line"/>: it runs through every
-    /// following line indented deeper (blank lines ride along inside). False when nothing
-    /// deeper follows, i.e. the line heads no block.</summary>
-    private bool FoldRangeAt(int line, out int end)
+    /// <summary>Whether this line may head a fold at all. The base folds any indentation
+    /// block; a code editor overrides to keep comment lines from growing markers.</summary>
+    protected virtual bool CanFoldAt(int line) => true;
+
+    /// <summary>The fold headed by <paramref name="line"/>, if any. The base folds
+    /// indentation blocks: every following line indented deeper (blank lines ride along
+    /// inside). An editor can override to add its own kinds - comment walls, regions.</summary>
+    protected virtual bool FoldRangeAt(int line, out int end)
     {
         end = line;
         if (line < 0 || line >= Buf.LineCount) return false;
+        if (!CanFoldAt(line)) return false;
         int baseIndent = LineIndentOf(Buf.Line(line));
         if (baseIndent < 0) return false; // a blank line heads nothing
         int last = line;
