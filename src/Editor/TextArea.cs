@@ -833,6 +833,18 @@ public class TextArea : Widget
         ResetBlink(); EnsureVisible(); NotifyCaret();
     }
 
+    /// <summary>Like <see cref="GoTo"/>, but the landing line takes the CENTER of the view
+    /// instead of scrolling just far enough - a jump from elsewhere (a terminal link, go-to)
+    /// reads best with its context on both sides.</summary>
+    public void GoToCentered(Position p)
+    {
+        Root()?.SetFocus(this);
+        _caret = _anchor = Buf.Clamp(p);
+        ScrollLine = Math.Clamp(RowIndexOf(_caret) - VisLines / 2, 0, Math.Max(0, _rows.Count - VisLines));
+        ResetBlink(); NotifyCaret();
+        Root()?.RequestRedraw();
+    }
+
     /// <summary>Selects the range and scrolls the caret end into view.</summary>
     public void Select(Position a, Position b)
     {
