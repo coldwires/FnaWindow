@@ -146,6 +146,19 @@ public class TextArea : Widget
     /// the line it annotates. Call <see cref="InvalidateAnnotations"/> when answers change.</summary>
     public Func<int, string?>? LineAnnotation;
 
+    // -- Jump flash: a fading band on a line you were just sent to -----------
+    private int _flashLine = -1;
+    private float _flashLeftMs;
+
+    /// <summary>Pulse a fading highlight on <paramref name="line"/> - the you-are-here flash
+    /// after a jump (terminal links, go-to). It fades on its own; any new flash replaces it.</summary>
+    public void FlashLine(int line)
+    {
+        _flashLine = line;
+        _flashLeftMs = 1400f;
+        Root()?.RequestRedraw();
+    }
+
     /// <summary>Re-asks <see cref="LineAnnotation"/> for every line (the source changed).</summary>
     public void InvalidateAnnotations()
     {
@@ -467,6 +480,11 @@ public class TextArea : Widget
         if (_blink >= Theme.CaretBlinkMs) { _blink -= Theme.CaretBlinkMs; _blinkOn = !_blinkOn; }
 
         if (InputBlocked) return;
+        if (_flashLeftMs > 0)
+        {
+            _flashLeftMs -= (float)t.ElapsedGameTime.TotalMilliseconds;
+            Root()?.RequestRedraw(); // keep frames coming while the flash fades
+        }
         if (FoldingEnabled) RevealCaretLine();
         if (!MouseBlocked) HandleMouse(input);
     }
@@ -1109,6 +1127,11 @@ public class TextArea : Widget
             // every row of that line, so "the line you are editing" still reads as one block.
             if (HighlightCurrentLine && row.Line == _caret.Line && !hasSel)
                 r.Fill(TextRect.X, y, TextRect.Width, CellH, Theme.EditorCurrentLine);
+
+            // The you-are-here flash rides over the current-line band and under the text.
+            if (_flashLeftMs > 0 && row.Line == _flashLine)
+                r.Fill(TextRect.X, y, TextRect.Width, CellH,
+                    new Color(255, 208, 90) * (Math.Min(1f, _flashLeftMs / 1000f) * 0.4f));
 
             if (ShowLineNumbers && row.Start == 0)
             {
