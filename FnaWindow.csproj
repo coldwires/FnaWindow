@@ -43,8 +43,29 @@
     Native libs and baked bitmap-font atlases, marked as Content so they copy to *this*
     project's output AND transitively into any consumer's output directory.
   -->
+  <!--
+    Which set of native libs to ship. x64 unless a consumer asks for x86, because a 32-bit process
+    cannot load 64-bit natives and the failure is a BadImageFormatException at window creation with
+    nothing pointing at the cause.
+
+    A consumer asks by passing the property through its ProjectReference, which is the only way a
+    property reliably reaches a referenced project:
+
+      <ProjectReference Include="engine\FnaWindow.csproj"
+                        AdditionalProperties="FnaWindowNativeArch=x86" />
+
+    and setting <PlatformTarget>x86</PlatformTarget> on itself. The Link keeps the DLLs flat in the
+    output directory either way, so nothing downstream sees the folder split.
+
+    x86 has no D3D12Core.dll: the D3D12 Agility SDK ships x64 only, so FNA3D falls back to D3D11 on
+    a 32-bit build.
+  -->
+  <PropertyGroup>
+    <FnaWindowNativeArch Condition="'$(FnaWindowNativeArch)' == ''">x64</FnaWindowNativeArch>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Content Include="lib\fnalibs\*.dll">
+    <Content Include="lib\fnalibs\$(FnaWindowNativeArch)\*.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>%(Filename)%(Extension)</Link>
     </Content>
