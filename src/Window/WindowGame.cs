@@ -184,20 +184,32 @@ public class WindowGame : Game
         // Editor: raster Courier is 8px wide at its 13px size, which is the only size that fits the
         // 8x15 editor cell - the 16px one is 9 wide and would break the monospace grid. It is two
         // pixels short of the cell, so it is reported at 15 and nudged down one to sit centred.
-        Swap("Courier", 13, false, lineHeight: Theme.EditorCellH, yOffset: 1, f => EditorFont = f);
+        Swap("Courier", 13, false, lineHeight: Theme.EditorCellH, yOffset: 1,
+            () => EditorFont, f => EditorFont = f);
 
-        Swap(SystemUiFamily, SystemUiHeight, false, 0, 0, f => UiFont = f);
-        Swap(SystemUiFamily, SystemUiHeight, true,  0, 0, f => UiBoldFont = f);
+        Swap(SystemUiFamily, SystemUiHeight, false, 0, 0, () => UiFont, f => UiFont = f);
+        Swap(SystemUiFamily, SystemUiHeight, true,  0, 0, () => UiBoldFont, f => UiBoldFont = f);
         // The chrome trick, kept for 3.1: the caption and menu bar take the same face a size up
         // and bold by default; the SystemChrome* virtuals retune it per app.
-        Swap(SystemChromeFamily, SystemChromeHeight, SystemChromeBold, 0, 0, f => ChromeFont = f);
+        Swap(SystemChromeFamily, SystemChromeHeight, SystemChromeBold, 0, 0,
+            () => ChromeFont, f => ChromeFont = f);
 
-        void Swap(string family, int px, bool bold, int lineHeight, int yOffset, Action<BitmapFont> assign)
+        void Swap(string family, int px, bool bold, int lineHeight, int yOffset,
+            Func<BitmapFont?> current, Action<BitmapFont> assign)
         {
             if (!BitmapFont.HasFamily(family)) return;   // GDI substitutes silently; do not let it
             var f = BitmapFont.FromSystemFont(GraphicsDevice, family, px, bold, lineHeight, yOffset,
                 antialiased: SystemUiAntialiased);
-            if (f != null) assign(f);
+            if (f == null) return;
+
+            // The field already holds a baked atlas, loaded moments ago in LoadContent. Assigning
+            // over it without disposing orphans that texture for the life of the process - four of
+            // them, in every app that sets UseSystemFonts, which is every 3.1 app in the family.
+            // BitmapFont.Load does not cache, so each one is a distinct texture and this is the
+            // only reference to it.
+            var previous = current();
+            assign(f);
+            previous?.Dispose();
         }
     }
 
