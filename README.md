@@ -61,6 +61,17 @@ git submodule add https://github.com/coldwires/FnaWindow engine
 
 That single reference pulls in the engine, FNA, the native libraries, and the fonts. See **[templates/starter-app/](templates/starter-app/)** for a short starter you can copy, and **[docs/EXTENDING.md](docs/EXTENDING.md#consuming-the-engine-as-a-git-submodule)** for the full workflow (updating, pinning, and the non-submodule option).
 
+**Building 32-bit.** The engine ships both sets of native libraries and defaults to 64-bit. A
+32-bit app sets `<PlatformTarget>x86</PlatformTarget>` on itself and asks for the matching natives
+through the reference, which is the only way a property reliably reaches a referenced project:
+
+```xml
+<ProjectReference Include="engine\FnaWindow.csproj" AdditionalProperties="FnaWindowNativeArch=x86" />
+```
+
+A 32-bit process cannot load 64-bit natives, and the failure does not say so. The 32-bit set has no
+`D3D12Core.dll` because the Direct3D 12 Agility SDK is 64-bit only; FNA3D uses D3D11 there.
+
 **Give your app a setup step.** A submodule is a pointer, not a copy: anyone who clones your app the
 normal way gets an empty `engine/` folder and a build that fails with confusing errors about
 `Microsoft.Xna` not existing. Either clone with `--recurse-submodules`, or ship a one-line script so
@@ -144,4 +155,4 @@ Four bitmap-font atlases live in `Content/fonts/`: a proportional MS Sans Serif 
 
 **MIT.** See [LICENSE](LICENSE). You can build closed-source, commercial apps on it.
 
-Vendored third-party components keep their own permissive licenses. FNA (`lib/FNA`) is the Microsoft Public License (Ms-PL); the native libraries in `lib/fnalibs` (SDL3, FAudio, FNA3D, Theorafile) are zlib or similar. All of them allow commercial, closed-source distribution as long as you preserve their notices when you ship.
+Vendored third-party components keep their own permissive licenses. FNA (`lib/FNA`) is the Microsoft Public License (Ms-PL); the native libraries in `lib/fnalibs/x64` and `lib/fnalibs/x86` (SDL3, FAudio, FNA3D, Theorafile) are zlib or similar. All of them allow commercial, closed-source distribution as long as you preserve their notices when you ship.
