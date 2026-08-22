@@ -76,10 +76,25 @@ internal static class WindowChrome
     private const uint SWP_FRAMECHANGED = 0x0020;
     private const uint SPI_GETWORKAREA = 0x0030;
 
+    // 32-bit user32.dll exports no GetWindowLongPtrW at all - there the Ptr forms are header
+    // macros for the 32-bit ones. Binding them unconditionally throws EntryPointNotFoundException
+    // on the first call, which lands in LoadContent and kills the window before it is shown.
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
-    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
-    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+        => IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : new IntPtr(GetWindowLong32(hWnd, nIndex));
+
+    private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+        => IntPtr.Size == 8
+            ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+            : new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
