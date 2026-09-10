@@ -20,11 +20,15 @@ The borderless path is Windows-only. On macOS and Linux the window falls back to
 
 ## Quick start
 
+Needs the .NET 10 SDK, pinned by `global.json`.
+
 ```sh
 git clone https://github.com/coldwires/FnaWindow fna-custom-window
 cd fna-custom-window
 dotnet run --project Demo
 ```
+
+Everything here targets `net10.0`, vendored FNA included.
 
 No setup step: FNA and the native libraries are vendored here, and the engine has no submodules of
 its own. (An app that *consumes* the engine does need one - see below.)

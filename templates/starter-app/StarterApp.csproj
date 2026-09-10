@@ -9,7 +9,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>  <!-- GUI subsystem: Exe would open a console window alongside -->
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
