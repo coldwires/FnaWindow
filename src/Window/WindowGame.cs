@@ -468,7 +468,8 @@ public class WindowGame : Game
     {
         if (MainThread.Drain()) RequestRedraw();   // apply background-thread work on the UI thread
         UpdateOutlineDrag();                       // the 3.1-style caption/edge drag, when opted in
-        Input.Update(gameTime, IsActive && !_odDragging); // unfocused or outline-dragging -> widgets see no input
+        // Unfocused or outline-dragging -> widgets see no input; pointer over another window -> no mouse.
+        Input.Update(gameTime, IsActive && !_odDragging, WindowChrome.PointerIsOurs(Window.Handle));
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);

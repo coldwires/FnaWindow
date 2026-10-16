@@ -52,7 +52,16 @@ public sealed class InputState
         }
     }
 
-    public void Update(GameTime gt, bool windowActive)
+    /// <summary>A mouse button went down while the pointer was over some other window, and is still
+    /// down. Until it is released our widgets see the buttons up, so dragging it onto us is no click.</summary>
+    private bool _foreignPress;
+
+    /// <param name="windowActive">Our window has keyboard focus.</param>
+    /// <param name="pointerOurs">The pointer is over our window and not over a window in front of
+    /// it (SDL's mouse focus). SDL reports the buttons globally, so without this a click on a window
+    /// lying over ours - one that does not take focus, or in the frame before focus moves - lands on
+    /// whatever of ours sits under the pointer.</param>
+    public void Update(GameTime gt, bool windowActive, bool pointerOurs = true)
     {
         double dt = gt.ElapsedGameTime.TotalMilliseconds;
         _totalMs += dt;
@@ -64,6 +73,20 @@ public sealed class InputState
         {
             _kb = Keyboard.GetState();
             _mouse = Microsoft.Xna.Framework.Input.Mouse.GetState();
+            bool held = AnyButton(_prevMouse);
+            if (!pointerOurs && !held)
+            {
+                // Not ours, and no drag of ours in flight: no press, no wheel, and the pointer parked
+                // far away so nothing shows a hover. A drag that began on us keeps going (SDL holds
+                // mouse focus while a button is down, and `held` covers the rest) so it still ends.
+                if (AnyButton(_mouse)) _foreignPress = true;
+                Park(-10000, -10000);
+            }
+            else if (_foreignPress)
+            {
+                if (AnyButton(_mouse)) Park(_mouse.X, _mouse.Y);
+                else _foreignPress = false;
+            }
         }
         else
         {
@@ -141,6 +164,18 @@ public sealed class InputState
             _typed.AddRange(_pendingTyped);
             _pendingTyped.Clear();
         }
+    }
+
+    private static bool AnyButton(MouseState m) =>
+        m.LeftButton == ButtonState.Pressed || m.RightButton == ButtonState.Pressed || m.MiddleButton == ButtonState.Pressed;
+
+    /// <summary>All buttons up at (x, y), with prev == current so there is no edge and no wheel.</summary>
+    private void Park(int x, int y)
+    {
+        _mouse = new MouseState(x, y, _mouse.ScrollWheelValue,
+            ButtonState.Released, ButtonState.Released, ButtonState.Released,
+            ButtonState.Released, ButtonState.Released);
+        _prevMouse = _mouse;
     }
 
     // -- Keyboard ----------------------------------------------------------

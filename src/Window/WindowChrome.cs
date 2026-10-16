@@ -22,6 +22,7 @@ internal static class WindowChrome
     private const string PROP_WIN32_HWND = "SDL.window.win32.hwnd";
 
     [DllImport(SDL)] private static extern uint SDL_GetWindowProperties(IntPtr window);
+    [DllImport(SDL)] private static extern IntPtr SDL_GetMouseFocus();
     [DllImport(SDL)] private static extern IntPtr SDL_CreateSurfaceFrom(
         int width, int height, uint format, IntPtr pixels, int pitch);
     [DllImport(SDL)] [return: MarshalAs(UnmanagedType.I1)]
@@ -50,6 +51,14 @@ internal static class WindowChrome
     public static void SetWindowPosition(IntPtr w, int x, int y) => SDL_SetWindowPosition(w, x, y);
     public static void GetWindowPosition(IntPtr w, out int x, out int y) => SDL_GetWindowPosition(w, out x, out y);
     public static void SetWindowSize(IntPtr w, int cw, int ch) => SDL_SetWindowSize(w, cw, ch);
+
+    /// <summary>Whether SDL's mouse focus is this window: the pointer is over it and not over a
+    /// window in front of it (SDL drops focus on leave, and keeps it while a button is held).</summary>
+    public static bool PointerIsOurs(IntPtr w)
+    {
+        try { return SDL_GetMouseFocus() == w; }
+        catch (Exception) { return true; }   // no such export: behave as before
+    }
     public static void GetWindowSize(IntPtr w, out int cw, out int ch) => SDL_GetWindowSize(w, out cw, out ch);
     public static void Minimize(IntPtr w) => SDL_MinimizeWindow(w);
 
