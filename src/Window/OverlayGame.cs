@@ -127,14 +127,48 @@ public abstract class OverlayGame : Game
         // everywhere else clicks fall through to whatever is underneath.
         if (Hwnd != IntPtr.Zero && GetCursorPos(out var cur))
             TakeMouse(Solid(new Point(cur.X - Area.X, cur.Y - Area.Y)) || (_takesMouse && Input.LeftDown));
-        // Another always-on-top window (the taskbar, when clicked) can come up over us; take the top back.
-        if ((_topmostMs += gameTime.ElapsedGameTime.TotalMilliseconds) > 1000 && Hwnd != IntPtr.Zero)
+        // A window that opens can push itself above always-on-top windows for a moment; take the top
+        // back the frame it happens, not up to a second later. Menus and tooltips keep their place.
+        if (Hwnd != IntPtr.Zero && CoveredBy() is { } over)
+        {
+            ZLog?.Invoke(over);
+            SetWindowPos(Hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+        }
+        if ((_topmostMs += gameTime.ElapsedGameTime.TotalMilliseconds) > 1000)
         {
             _topmostMs = 0;
             try { SDL_SetWindowAlwaysOnTop(Window.Handle, true); } catch { }
-            SetWindowPos(Hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
         }
         base.Update(gameTime);
+    }
+
+    /// <summary>CREW_OVERLAY_ZLOG=FILE notes each window found above the overlay, for tracking down
+    /// what covers it.</summary>
+    private static readonly Action<string>? ZLog = Environment.GetEnvironmentVariable("CREW_OVERLAY_ZLOG") is { Length: > 0 } zf
+        ? s => { try { System.IO.File.AppendAllText(zf, DateTime.Now.ToString("HH:mm:ss.fff ") + s + Environment.NewLine); } catch { } }
+        : null;
+
+    /// <summary>A visible window above ours that is not a menu, tooltip or part of the shell's own
+    /// popups (the class name, for the log); null when nothing covers us.</summary>
+    private string? CoveredBy()
+    {
+        uint self = (uint)Environment.ProcessId;
+        var cls = new System.Text.StringBuilder(64);
+        for (IntPtr h = GetWindow(Hwnd, GW_HWNDPREV); h != IntPtr.Zero; h = GetWindow(h, GW_HWNDPREV))
+        {
+            if (!IsWindowVisible(h)) continue;
+            GetWindowThreadProcessId(h, out uint pid);
+            if (pid == self) continue;
+            if (DwmGetWindowAttribute(h, 14 /* DWMWA_CLOAKED */, out int cloaked, 4) == 0 && cloaked != 0) continue;
+            cls.Clear();
+            GetClassNameW(h, cls, cls.Capacity);
+            string c = cls.ToString();
+            if (c is "#32768" or "tooltips_class32" or "Xaml_WindowedPopupClass" or "Windows.UI.Core.CoreWindow"
+                or "NotifyIconOverflowWindow" or "TopLevelWindowForOverflowXamlIsland" or "XamlExplorerHostIslandWindow"
+                or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") continue;
+            return c + " (pid " + pid + ")";
+        }
+        return null;
     }
 
     private void TakeMouse(bool take)
@@ -197,6 +231,11 @@ public abstract class OverlayGame : Game
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int value, int size);
+    private const uint GW_HWNDPREV = 3;
     [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
     [DllImport("user32.dll")] private static extern IntPtr GetDesktopWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassNameW(IntPtr h, System.Text.StringBuilder s, int n);
