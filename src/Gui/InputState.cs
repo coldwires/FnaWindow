@@ -167,7 +167,8 @@ public sealed class InputState
     }
 
     private static bool AnyButton(MouseState m) =>
-        m.LeftButton == ButtonState.Pressed || m.RightButton == ButtonState.Pressed || m.MiddleButton == ButtonState.Pressed;
+        m.LeftButton == ButtonState.Pressed || m.RightButton == ButtonState.Pressed || m.MiddleButton == ButtonState.Pressed
+        || m.XButton1 == ButtonState.Pressed || m.XButton2 == ButtonState.Pressed;
 
     /// <summary>All buttons up at (x, y), with prev == current so there is no edge and no wheel.</summary>
     private void Park(int x, int y)
@@ -202,6 +203,11 @@ public sealed class InputState
     public bool MiddlePressed => _mouse.MiddleButton == ButtonState.Pressed && _prevMouse.MiddleButton == ButtonState.Released;
     public bool MiddleReleased => _mouse.MiddleButton == ButtonState.Released && _prevMouse.MiddleButton == ButtonState.Pressed;
 
+    /// <summary>The mouse's side buttons (XButton1 and XButton2), which browsers and Explorer use
+    /// for back and forward. True on the frame the button goes down.</summary>
+    public bool BackPressed => _mouse.XButton1 == ButtonState.Pressed && _prevMouse.XButton1 == ButtonState.Released;
+    public bool ForwardPressed => _mouse.XButton2 == ButtonState.Pressed && _prevMouse.XButton2 == ButtonState.Released;
+
     /// <summary>True if anything happened this frame (mouse moved/held, wheel, key, or text).
     /// Used to keep the render loop awake; when false and nothing requests a redraw, drawing idles.</summary>
     public bool AnyActivity =>
@@ -209,6 +215,8 @@ public sealed class InputState
         || _mouse.LeftButton == ButtonState.Pressed
         || _mouse.RightButton == ButtonState.Pressed
         || _mouse.MiddleButton == ButtonState.Pressed
+        || _mouse.XButton1 == ButtonState.Pressed
+        || _mouse.XButton2 == ButtonState.Pressed
         || WheelDelta != 0
         || _typed.Count > 0
         || _kb.GetPressedKeys().Length > 0;
