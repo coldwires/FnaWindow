@@ -55,12 +55,15 @@ public sealed partial class BitmapFont
     /// Only meaningful for a TrueType face. A .FON raster font has no greys to keep, so this also
     /// stops asking GDI for raster precision - otherwise it hands back a bitmap face that cannot
     /// be antialiased and the flag appears to do nothing.</param>
+    /// <param name="fallbacks">Faces to take a character from when <paramref name="family"/> does not
+    /// have it, first match wins, drawn on the same baseline. Without them a missing character comes
+    /// out as whatever GDI substitutes, often a bare stroke.</param>
     public static BitmapFont? FromSystemFont(GraphicsDevice gd, string family, int height,
         bool bold = false, int lineHeight = 0, int yOffset = 0,
-        IReadOnlyList<int>? codepoints = null, bool antialiased = false)
+        IReadOnlyList<int>? codepoints = null, bool antialiased = false, IReadOnlyList<string>? fallbacks = null)
     {
         if (!Supported) return null;
-        try { return Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints, antialiased); }
+        try { return Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints, antialiased, fallbacks); }
         catch { return null; }
     }
 
@@ -107,8 +110,9 @@ public sealed partial class BitmapFont
     }
 
     private static BitmapFont? Rasterise(GraphicsDevice gd, string family, int height, bool bold,
-        int lineHeight, int yOffset, IReadOnlyList<int>? codepoints, bool antialiased = false)
+        int lineHeight, int yOffset, IReadOnlyList<int>? codepoints, bool antialiased = false, IReadOnlyList<string>? fallbacks = null)
     {
+        var fallbackFonts = new List<IntPtr>();
         var codes = codepoints ?? DefaultCodepoints;
 
         IntPtr dc = CreateCompatibleDC(IntPtr.Zero);
@@ -124,12 +128,36 @@ public sealed partial class BitmapFont
             if (!GetTextMetricsW(dc, out TEXTMETRIC tm)) return null;
             int cellH = tm.tmHeight;
 
+            // Characters this face lacks come from the first fallback face that has them, moved so
+            // the two faces share a baseline.
+            var borrowed = new Dictionary<int, (IntPtr font, int dy)>();
+            if (fallbacks != null)
+            {
+                var missing = new List<int>();
+                foreach (int c in codes) if (!HasGlyph(dc, c)) missing.Add(c);
+                foreach (string fam in fallbacks)
+                {
+                    if (missing.Count == 0) break;
+                    if (!HasFamily(fam)) continue;
+                    IntPtr ff = MakeFont(fam, height, bold, antialiased);
+                    if (ff == IntPtr.Zero) continue;
+                    fallbackFonts.Add(ff);
+                    SelectObject(dc, ff);
+                    GetTextMetricsW(dc, out TEXTMETRIC ftm);
+                    for (int i = missing.Count - 1; i >= 0; i--)
+                        if (HasGlyph(dc, missing[i])) { borrowed[missing[i]] = (ff, tm.tmAscent - ftm.tmAscent); missing.RemoveAt(i); }
+                    SelectObject(dc, font);
+                }
+            }
+
             // Per-glyph advances, and the atlas layout that follows from them.
             var advance = new Dictionary<int, int>(codes.Count);
             foreach (int c in codes)
             {
                 var buf = new int[1];
+                if (borrowed.TryGetValue(c, out var bf)) SelectObject(dc, bf.font);
                 advance[c] = GetCharWidth32W(dc, (uint)c, (uint)c, buf) ? Math.Max(0, buf[0]) : tm.tmAveCharWidth;
+                if (borrowed.ContainsKey(c)) SelectObject(dc, font);
             }
 
             // A cell is the glyph's advance plus a side bearing, NOT just the advance.
@@ -175,7 +203,13 @@ public sealed partial class BitmapFont
                 var r = place[c];
                 // Inset by the bearing so the glyph sits centred in its padded cell and its
                 // overhang has somewhere to go on both sides.
-                TextOutW(dc, r.X + bearing, r.Y, char.ConvertFromUtf32(c), 1);
+                if (borrowed.TryGetValue(c, out var bf))
+                {
+                    SelectObject(dc, bf.font);
+                    TextOutW(dc, r.X + bearing, r.Y + bf.dy, char.ConvertFromUtf32(c), 1);
+                    SelectObject(dc, font);
+                }
+                else TextOutW(dc, r.X + bearing, r.Y, char.ConvertFromUtf32(c), 1);
             }
             GdiFlush();
 
@@ -215,11 +249,24 @@ public sealed partial class BitmapFont
         {
             if (prevDib != IntPtr.Zero) SelectObject(dc, prevDib);
             if (prevFont != IntPtr.Zero) SelectObject(dc, prevFont);
+            foreach (var ff in fallbackFonts) DeleteObject(ff);
             if (dib != IntPtr.Zero) DeleteObject(dib);
             if (font != IntPtr.Zero) DeleteObject(font);
             if (dc != IntPtr.Zero) DeleteDC(dc);
         }
     }
+
+    /// <summary>Whether the face selected into the DC has its own glyph for this character.</summary>
+    private static bool HasGlyph(IntPtr dc, int c)
+    {
+        if (c > 0xFFFF) return false;
+        var idx = new ushort[1];
+        return GetGlyphIndicesW(dc, char.ConvertFromUtf32(c), 1, idx, GGI_MARK_NONEXISTING_GLYPHS) != uint.MaxValue && idx[0] != 0xFFFF;
+    }
+
+    private const uint GGI_MARK_NONEXISTING_GLYPHS = 1;
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint GetGlyphIndicesW(IntPtr hdc, string text, int count, [Out] ushort[] indices, uint flags);
 
     /// <summary>Printable ASCII, plus the two punctuation marks the Win 3.1 UI text uses literally.</summary>
     private static readonly int[] DefaultCodepoints = BuildDefaultCodepoints();
