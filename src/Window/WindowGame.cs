@@ -290,6 +290,9 @@ public class WindowGame : Game
     {
         if (CursorDefault == null || !Cursors.Any) return;
         string key = CursorDefault;
+        // Unfocused, the window takes no mouse input, so the pointer it last saw is stale: hover
+        // cursors chosen from it would be wrong. The default until the window is active again.
+        if (!IsActive) { Cursors.Set(key); return; }
         if (Root.CursorCapture is { } cap)
             key = cap.CursorKey(Input.Mouse) ?? key;
         else if (!Root.Popup.IsOpen)
