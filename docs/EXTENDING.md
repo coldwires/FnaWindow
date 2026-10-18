@@ -505,6 +505,13 @@ Raster fonts only exist at the sizes baked into the file - MS Sans Serif at 13 a
 Courier 13, 16 and 20 - so ask for one that exists. The editor grid needs an 8px advance, and only
 Courier 13 and Fixedsys 15 provide it.
 
+A font the app ships itself - one it may redistribute, such as an OFL face, kept under its Content
+folder - goes through the same path: `BitmapFont.AddFontFile(path)` makes the file usable by family
+name for this process only (nothing is installed, and it is gone when the app exits), and
+`FromSystemFont` then rasterises it like any other. Ship static instances rather than a variable font.
+Pixel fonts drawn unsmoothed stay crisp only at a whole number of screen pixels per design pixel, so
+size them from the font's own grid (its units per design pixel) rather than by eye.
+
 ---
 
 ## Gotchas

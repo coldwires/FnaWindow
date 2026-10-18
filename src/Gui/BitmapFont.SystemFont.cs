@@ -64,6 +64,24 @@ public sealed partial class BitmapFont
         catch { return null; }
     }
 
+    /// <summary>
+    /// Makes a font file the app ships (a .ttf or .otf, say under its Content folder) usable by
+    /// <see cref="FromSystemFont"/> and <see cref="HasFamily"/> under its family name, for this
+    /// process only: nothing is installed, no other program sees it, and it is gone when the app
+    /// exits. Returns false if the file could not be loaded, or off Windows.
+    ///
+    /// For fonts the app is licensed to redistribute (an OFL font, its own): it is the shipped
+    /// counterpart to reading the user's own installed faces. Call it before the first
+    /// <see cref="FromSystemFont"/> that wants the family. Ship static instances rather than a
+    /// variable font; GDI is more dependable with those.
+    /// </summary>
+    public static bool AddFontFile(string path)
+    {
+        if (!Supported || !System.IO.File.Exists(path)) return false;
+        try { return AddFontResourceExW(path, FR_PRIVATE, IntPtr.Zero) > 0; }
+        catch { return false; }
+    }
+
     /// <summary>True if <paramref name="family"/> resolves to itself rather than being quietly
     /// substituted. GDI never reports a miss, so this asks what it actually selected.</summary>
     public static bool HasFamily(string family)
@@ -253,6 +271,9 @@ public sealed partial class BitmapFont
         uint pitchAndFamily, string face);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int AddFontResourceExW(string name, uint flags, IntPtr reserved);
+    private const uint FR_PRIVATE = 0x10;
     [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
     [DllImport("gdi32.dll")] private static extern int SetBkMode(IntPtr hdc, int mode);
