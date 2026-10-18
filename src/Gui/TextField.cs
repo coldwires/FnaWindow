@@ -94,6 +94,8 @@ public sealed class TextField
     }
 
     public void SelectAll() { _anchor = 0; _caret = _text.Length; Blink(); }
+    /// <summary>Type this in at the caret, over any selection, as a paste would (within MaxLength).</summary>
+    public void InsertAtCaret(string s) { Insert(s); Changed?.Invoke(_text); }
     public void Deselect() { _anchor = _caret; Blink(); }
     public void MoveToEnd() { _caret = _anchor = _text.Length; Blink(); }
 
