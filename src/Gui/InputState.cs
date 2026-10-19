@@ -61,7 +61,9 @@ public sealed class InputState
     /// it (SDL's mouse focus). SDL reports the buttons globally, so without this a click on a window
     /// lying over ours - one that does not take focus, or in the frame before focus moves - lands on
     /// whatever of ours sits under the pointer.</param>
-    public void Update(GameTime gt, bool windowActive, bool pointerOurs = true)
+    /// <param name="hoverInactive">Not focused, but the pointer is over us: pass the pointer and the
+    /// wheel through, never the buttons or keys, as Windows does when it scrolls an inactive window.</param>
+    public void Update(GameTime gt, bool windowActive, bool pointerOurs = true, bool hoverInactive = false)
     {
         double dt = gt.ElapsedGameTime.TotalMilliseconds;
         _totalMs += dt;
@@ -87,6 +89,20 @@ public sealed class InputState
                 if (AnyButton(_mouse)) Park(_mouse.X, _mouse.Y);
                 else _foreignPress = false;
             }
+        }
+        else if (hoverInactive && pointerOurs)
+        {
+            // Unfocused but under the pointer: hover and scroll work, clicks and keys do not. All
+            // buttons stay released in both snapshots, so focusing us later makes no stray edge.
+            var live = Microsoft.Xna.Framework.Input.Mouse.GetState();
+            _kb = default;
+            _prevKb = _kb;
+            _mouse = new MouseState(live.X, live.Y, live.ScrollWheelValue,
+                ButtonState.Released, ButtonState.Released, ButtonState.Released,
+                ButtonState.Released, ButtonState.Released);
+            _prevMouse = new MouseState(_prevMouse.X, _prevMouse.Y, _prevMouse.ScrollWheelValue,
+                ButtonState.Released, ButtonState.Released, ButtonState.Released,
+                ButtonState.Released, ButtonState.Released);
         }
         else
         {
