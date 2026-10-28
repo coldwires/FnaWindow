@@ -22,17 +22,18 @@ public static class FolderPicker
     /// <param name="owner">The game window's HWND, or zero for none.</param>
     /// <param name="start">The folder it opens in, if it exists.</param>
     public static void Show(IntPtr owner, string title, string? start, Action<string?> done)
-        => Run(owner, title, start, folders: true, multiple: false, picked => done(picked?.Length > 0 ? picked[0] : null));
+        => Run(owner, title, start, folders: true, multiple: false, null, picked => done(picked?.Length > 0 ? picked[0] : null));
 
     /// <summary>Shows the dialog on its own STA thread and posts what was picked (null if cancelled)
     /// to the game thread.</summary>
-    internal static void Run(IntPtr owner, string title, string? start, bool folders, bool multiple, Action<string[]?> done)
+    internal static void Run(IntPtr owner, string title, string? start, bool folders, bool multiple,
+        (string Name, string Pattern)[]? types, Action<string[]?> done)
     {
         if (Interlocked.Exchange(ref _open, 1) == 1) return;
         var thread = new Thread(() =>
         {
             string[]? picked = null;
-            try { picked = Pick(owner, title, start, folders, multiple); }
+            try { picked = Pick(owner, title, start, folders, multiple, types); }
             catch (Exception) { picked = null; }
             Volatile.Write(ref _open, 0);
             MainThread.Post(() => done(picked));
@@ -45,10 +46,13 @@ public static class FolderPicker
         FOS_PATHMUSTEXIST = 0x800, FOS_FILEMUSTEXIST = 0x1000;
     private const uint SIGDN_FILESYSPATH = 0x80058000;
 
-    private static string[]? Pick(IntPtr owner, string title, string? start, bool folders, bool multiple)
+    private static string[]? Pick(IntPtr owner, string title, string? start, bool folders, bool multiple, (string Name, string Pattern)[]? types)
     {
         if (!OperatingSystem.IsWindows()) return null;   // the shell's dialog exists only there
         var dialog = (IFileOpenDialog)new FileOpenDialogClass();
+        // The type list (COMDLG_FILTERSPEC: two string pointers each) must outlive the dialog.
+        var strings = new List<IntPtr>();
+        IntPtr specs = IntPtr.Zero;
         try
         {
             dialog.GetOptions(out uint options);
@@ -57,6 +61,18 @@ public static class FolderPicker
             if (multiple) options |= FOS_ALLOWMULTISELECT;
             dialog.SetOptions(options);
             dialog.SetTitle(title);
+            if (!folders && types is { Length: > 0 })
+            {
+                specs = Marshal.AllocHGlobal(types.Length * 2 * IntPtr.Size);
+                for (int i = 0; i < types.Length; i++)
+                {
+                    IntPtr name = Marshal.StringToCoTaskMemUni(types[i].Name), pattern = Marshal.StringToCoTaskMemUni(types[i].Pattern);
+                    strings.Add(name); strings.Add(pattern);
+                    Marshal.WriteIntPtr(specs, (2 * i) * IntPtr.Size, name);
+                    Marshal.WriteIntPtr(specs, (2 * i + 1) * IntPtr.Size, pattern);
+                }
+                dialog.SetFileTypes((uint)types.Length, specs);
+            }
             if (start != null && System.IO.Directory.Exists(start))
             {
                 var iid = typeof(IShellItem).GUID;
@@ -91,7 +107,12 @@ public static class FolderPicker
             }
             return paths.ToArray();
         }
-        finally { Marshal.ReleaseComObject(dialog); }
+        finally
+        {
+            Marshal.ReleaseComObject(dialog);
+            foreach (var s in strings) Marshal.FreeCoTaskMem(s);
+            if (specs != IntPtr.Zero) Marshal.FreeHGlobal(specs);
+        }
     }
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -173,6 +194,9 @@ public static class FilePicker
     /// <param name="owner">The game window's HWND, or zero for none.</param>
     /// <param name="start">The folder it opens in, if it exists.</param>
     /// <param name="multiple">Let several files be chosen at once.</param>
-    public static void Show(IntPtr owner, string title, string? start, bool multiple, Action<string[]?> done)
-        => FolderPicker.Run(owner, title, start, folders: false, multiple, done);
+    /// <param name="types">The dialog's type list, first one shown: a name and its patterns, as
+    /// ("Notes (*.md)", "*.md") or ("Images", "*.png;*.jpg"). None shows every file.</param>
+    public static void Show(IntPtr owner, string title, string? start, bool multiple, Action<string[]?> done,
+        params (string Name, string Pattern)[] types)
+        => FolderPicker.Run(owner, title, start, folders: false, multiple, types, done);
 }
