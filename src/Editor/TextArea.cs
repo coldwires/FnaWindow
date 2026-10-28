@@ -551,7 +551,7 @@ public class TextArea : Widget
 
                 // Continuous grab: at the window edge the cursor wraps to the opposite side
                 // and the pan re-anchors once the warp lands - it never runs out of desk.
-                if (Root() is { } rw && MouseWarp.WrapInClient(m, rw.Bounds, out var warped))
+                if (Root() is { } rw && MouseWarp.WrapInClient(m, rw.Bounds, input.Scale, out var warped))
                 {
                     _panWarp = warped;
                     _panWarpGrace = 6;

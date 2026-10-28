@@ -34,6 +34,9 @@ public sealed class InputState
 
     public Point Mouse { get; private set; }
     public Point PrevMouse { get; private set; }
+
+    /// <summary>Pixels per logical unit; see <c>WindowGame.UiScale</c>. Never below 1.</summary>
+    public float Scale { get; set; } = 1f;
     public int WheelDelta { get; private set; }
     public bool DoubleClicked { get; private set; }
 
@@ -119,8 +122,11 @@ public sealed class InputState
             _prevMouse = _mouse;
         }
 
-        PrevMouse = new Point(_prevMouse.X, _prevMouse.Y);
-        Mouse = new Point(_mouse.X, _mouse.Y);
+        // FNA reports the pointer in screen pixels; widgets hit-test in logical units, so the
+        // position is divided by the scale exactly once, here. Anything reading InputState.Mouse
+        // is therefore already in the same space as the Bounds it is comparing against.
+        PrevMouse = new Point((int)(_prevMouse.X / Scale), (int)(_prevMouse.Y / Scale));
+        Mouse = new Point((int)(_mouse.X / Scale), (int)(_mouse.Y / Scale));
         // Carry sub-notch wheel movement instead of truncating it away, so a precision touchpad or
         // free-spin wheel that reports deltas under one 120-unit notch still scrolls.
         int wheel = _wheelRemainder + (_mouse.ScrollWheelValue - _prevMouse.ScrollWheelValue);

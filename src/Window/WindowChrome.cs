@@ -294,4 +294,47 @@ internal static class WindowChrome
         catch { return false; }
         finally { pin.Free(); }
     }
+
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+    [DllImport("user32.dll")] private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO mi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor, rcWork;
+        public uint dwFlags;
+    }
+
+    /// <summary>
+    /// The window's monitor DPI, or 96 when it cannot be read. 96 is one-to-one, so a failure here
+    /// costs the old behaviour rather than a wrong scale.
+    /// </summary>
+    public static uint DpiFor(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return 96;
+        try
+        {
+            uint dpi = GetDpiForWindow(hWnd);
+            return dpi == 0 ? 96 : dpi;
+        }
+        catch (EntryPointNotFoundException) { return 96; }
+    }
+
+    /// <summary>
+    /// The usable area of the monitor the window is on, in physical pixels, taskbar excluded.
+    /// Zero size when it cannot be read, which callers treat as "do not clamp".
+    /// </summary>
+    public static (int Width, int Height) WorkArea(IntPtr hWnd)
+    {
+        try
+        {
+            IntPtr mon = MonitorFromWindow(hWnd, 2 /* MONITOR_DEFAULTTONEAREST */);
+            if (mon == IntPtr.Zero) return (0, 0);
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (!GetMonitorInfoW(mon, ref mi)) return (0, 0);
+            return (mi.rcWork.Right - mi.rcWork.Left, mi.rcWork.Bottom - mi.rcWork.Top);
+        }
+        catch { return (0, 0); }
+    }
 }

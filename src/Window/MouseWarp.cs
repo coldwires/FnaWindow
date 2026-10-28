@@ -14,8 +14,10 @@ internal static class MouseWarp
 {
     /// <summary>If <paramref name="m"/> sits within a hair of <paramref name="client"/>'s edge,
     /// warp to the opposite edge (slightly inset, so it does not immediately re-trigger) and
-    /// report the new client-space position.</summary>
-    public static bool WrapInClient(Point m, Rectangle client, out Point warped)
+    /// report the new client-space position. <paramref name="m"/> and <paramref name="client"/> are
+    /// logical (see <c>WindowGame.UiScale</c>); <paramref name="scale"/> turns the target into the
+    /// pixels Windows places the cursor in.</summary>
+    public static bool WrapInClient(Point m, Rectangle client, float scale, out Point warped)
     {
         warped = m;
         if (!OperatingSystem.IsWindows()) return false;
@@ -30,7 +32,7 @@ internal static class MouseWarp
         // The gesture's window is the foreground window: a pan starts with a press in it.
         IntPtr hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return false;
-        var p = new POINT { X = x, Y = y };
+        var p = new POINT { X = (int)MathF.Round(x * scale), Y = (int)MathF.Round(y * scale) };
         if (!ClientToScreen(hwnd, ref p) || !SetCursorPos(p.X, p.Y)) return false;
         warped = new Point(x, y);
         return true;

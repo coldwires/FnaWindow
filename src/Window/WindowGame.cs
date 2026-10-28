@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Globalization;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -92,6 +93,8 @@ public class WindowGame : Game
     public WindowGame(string title = "FNA Custom Window", int width = 1024, int height = 768)
     {
         _titleText = title;
+        _designW = width;
+        _designH = height;
         Graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = width,
@@ -105,6 +108,40 @@ public class WindowGame : Game
         IsMouseVisible = true;
         Content.RootDirectory = "Content";
     }
+
+    private readonly int _designW, _designH;
+
+    /// <summary>
+    /// Whole-number factor between the UI's own coordinates and screen pixels. Every widget lays
+    /// out and draws in logical units and this multiplies the result on the way to the screen, so
+    /// a 13px font is 13 logical units at any scale and never a fractional number of pixels.
+    ///
+    /// Whole numbers only, because the look is 1-bit glyphs and single-pixel bevels: 1.5x resampling
+    /// turns both to mush, which is the same failure SyncBackBuffer exists to prevent. A 150%
+    /// display therefore runs at 2x and shows a little more than it would at 1.5x, rather than
+    /// running soft.
+    /// </summary>
+    public float UiScale { get; private set; } = 1f;
+
+    /// <summary>Read the monitor DPI at startup and scale to match. Off leaves the app at 1x.</summary>
+    protected virtual bool AutoUiScale => true;
+
+    /// <summary>Ceiling for the automatic scale. 3x covers 300% displays; beyond that is guesswork.</summary>
+    protected virtual float MaxUiScale => 3f;
+
+    /// <summary>
+    /// Round the DPI to a whole-number scale. On by default because the look is 1-bit glyphs and
+    /// single-pixel bevels, and only a whole number maps one logical pixel onto an exact block of
+    /// screen pixels. Off follows the monitor exactly, which sizes the window the way Windows
+    /// intends at 125% and 150% - at the cost of a bevel that is 1px in places and 2px in others.
+    /// </summary>
+    protected virtual bool WholeNumberUiScale => true;
+
+    /// <summary>
+    /// Forced scale, or 0 to derive one from the monitor. <c>FNAWINDOW_UISCALE</c> overrides it, so
+    /// a value can be tried on a running build without a rebuild.
+    /// </summary>
+    protected virtual float ForcedUiScale => 0f;
 
     /// <summary>Populate the frame: set <c>frame.Title.Title</c>, and SetMenu / SetContent / SetStatus.</summary>
     protected virtual void BuildUi(WindowFrame frame, BitmapFont uiFont) { }
@@ -300,7 +337,8 @@ public class WindowGame : Game
             // A resize edge/corner is the strongest affordance, so its size cursor wins over any
             // widget's: hovering the border hints the drag WindowHitTest already allows. Maximized
             // returns no edge codes, so no size cursor shows there (nothing to resize).
-            if (EdgeCursor(WindowHitTest(Input.Mouse.X, Input.Mouse.Y)) is { } edge) key = edge;
+            // The hit test works in pixels and the pointer here is logical.
+            if (EdgeCursor(WindowHitTest((int)(Input.Mouse.X * UiScale), (int)(Input.Mouse.Y * UiScale))) is { } edge) key = edge;
             else
                 for (var w = Root.HitTest(Input.Mouse); w != null; w = w.Parent)
                     if (w.CursorKey(Input.Mouse) is { } k) { key = k; break; }
@@ -360,6 +398,8 @@ public class WindowGame : Game
             _hwnd = WindowChrome.GetHwnd(_sdlWindow);
             if (_hwnd != IntPtr.Zero)
             {
+                ApplyUiScale();
+
                 // Subclass FIRST. MakeBorderless changes the styles and asks for a frame change,
                 // which makes Windows send WM_NCCALCSIZE straight away - and that message is where
                 // the frame is collapsed. Installed the other way round, the original wndproc
@@ -415,6 +455,59 @@ public class WindowGame : Game
     /// without it, a resized window keeps rendering at the old size and FNA scales the result, which
     /// turns every 1-bit glyph and single-pixel bevel soft.
     /// </summary>
+    /// <summary>
+    /// Chooses the scale from the monitor DPI and grows the window to match, once, at startup.
+    ///
+    /// The constructor's width and height are the LOGICAL design size. At 2x the window wants twice
+    /// that in pixels, which on a small high-DPI screen can be larger than the screen: 1060x720 at
+    /// 2x is 2120x1440, and the monitor this was written on is 1920x1080. So the pixel size is
+    /// clamped to the work area, and the logical viewport that falls out is smaller than the design
+    /// size. The layout reflows into it, which is the behaviour a resize already exercises.
+    ///
+    /// Scaling down is never the answer: 1x on a 150% display is the tiny-window complaint this
+    /// whole mechanism exists to fix.
+    /// </summary>
+    private void ApplyUiScale()
+    {
+        if (!AutoUiScale) return;
+
+        float scale = ForcedUiScale;
+        if (Environment.GetEnvironmentVariable("FNAWINDOW_UISCALE") is { } env
+            && float.TryParse(env, NumberStyles.Float, CultureInfo.InvariantCulture, out float forced)
+            && forced > 0f)
+            scale = forced;
+
+        if (scale <= 0f)
+        {
+            scale = WindowChrome.DpiFor(_hwnd) / 96f;
+            if (WholeNumberUiScale) scale = MathF.Round(scale, MidpointRounding.AwayFromZero);
+        }
+
+        UiScale = Math.Clamp(scale, 1f, MathF.Max(1f, MaxUiScale));
+        Input.Scale = UiScale;
+        if (UiScale == 1f) return;
+
+        int w = (int)MathF.Round(_designW * UiScale), h = (int)MathF.Round(_designH * UiScale);
+        var (workW, workH) = WindowChrome.WorkArea(_hwnd);
+        if (workW > 0 && workH > 0) { w = Math.Min(w, workW); h = Math.Min(h, workH); }
+
+        _syncingBackBuffer = true;
+        try
+        {
+            Graphics.PreferredBackBufferWidth = w;
+            Graphics.PreferredBackBufferHeight = h;
+            Graphics.ApplyChanges();
+        }
+        catch { /* a device that refuses the size leaves the app at its startup size, not broken */ }
+        finally { _syncingBackBuffer = false; }
+
+        // Lay out against the new size NOW. ClientSizeChanged does schedule one, but through the
+        // resize-settle counter, which is eight frames away - and until it fires the tree is still
+        // arranged for the pre-scale size, so the caption buttons sit off the right edge. Long
+        // enough to be caught by a startup screenshot, and to show as a flash of wrong layout.
+        Relayout();
+    }
+
     private void SyncBackBuffer()
     {
         if (_syncingBackBuffer) return;   // ApplyChanges raises ClientSizeChanged again
@@ -457,12 +550,14 @@ public class WindowGame : Game
             // Maximized windows go square (as Windows itself does) - and the region must never
             // be smaller than the true maximized bounds, or an edge sliver gets clipped.
             WindowShape.Apply(_hwnd, Window.ClientBounds.Width, Window.ClientBounds.Height,
-                _maximized ? 0 : WindowCornerRadius);
+                _maximized ? 0 : (int)MathF.Round(WindowCornerRadius * UiScale));
         }
 
         if (Root == null) return;
+        // The viewport is pixels; the widget tree is logical. Everything below this line is logical.
         var vp = GraphicsDevice.Viewport;
-        Root.Bounds = new Rectangle(0, 0, vp.Width, vp.Height);
+        Root.Bounds = new Rectangle(0, 0,
+            (int)MathF.Ceiling(vp.Width / UiScale), (int)MathF.Ceiling(vp.Height / UiScale));
         Frame.Bounds = Root.Bounds;
         Root.Layout();
     }
@@ -504,13 +599,17 @@ public class WindowGame : Game
         {
             var vp = GraphicsDevice.Viewport;
             GraphicsDevice.Clear(Theme.Face);
+            // PointClamp plus a whole-number matrix: every logical pixel becomes an exact block of
+            // screen pixels, so nothing is resampled and the 1-bit look survives the scale.
             Batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
-                SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone);
+                SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone,
+                null, Matrix.CreateScale(UiScale));
             try
             {
                 Root.Draw(Renderer);
                 if (_flashMs > 0)
-                    Renderer.Fill(new Rectangle(0, 0, vp.Width, vp.Height),
+                    Renderer.Fill(new Rectangle(0, 0,
+                        (int)MathF.Ceiling(vp.Width / UiScale), (int)MathF.Ceiling(vp.Height / UiScale)),
                         Color.White * (FlashMaxAlpha * (float)(_flashMs / FlashMs)));
                 Cursor?.Draw(Batch, Input.Mouse);   // software pointer sits on top of everything
             }
@@ -539,7 +638,8 @@ public class WindowGame : Game
         GraphicsDevice.SetRenderTarget(rt);
         GraphicsDevice.Clear(Theme.Face);
         Batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
-            SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone);
+            SamplerState.PointClamp, DepthStencilState.None, RasterizerState.CullNone,
+            null, Matrix.CreateScale(UiScale));
         try { Root.Draw(Renderer); }
         finally { Batch.End(); }
         GraphicsDevice.SetRenderTarget(null);
@@ -584,8 +684,10 @@ public class WindowGame : Game
             // The border band tracks the skin's frame thickness; corners reach C px along each
             // edge (as Windows itself does), because a band-by-band corner is a 4x4 target
             // nobody can hit.
-            int E = ThemeManager.Skin.WindowFrameThickness;
-            const int C = 20;
+            // cx/cy come from Windows in pixels, so the frame and corner bands are scaled to match
+            // the chrome the user is actually aiming at.
+            int E = (int)MathF.Round(ThemeManager.Skin.WindowFrameThickness * UiScale);
+            int C = (int)MathF.Round(20 * UiScale);
             var vp = GraphicsDevice.Viewport;
             int w = vp.Width, h = vp.Height;
             bool l = cx < E, r = cx >= w - E, tp = cy < E, bt = cy >= h - E;
@@ -599,7 +701,8 @@ public class WindowGame : Game
             if (tp) return WindowChrome.HTTOP;
             if (bt) return WindowChrome.HTBOTTOM;
         }
-        if (Caption.IsOnDragArea(new Point(cx, cy))) return WindowChrome.HTCAPTION;
+        // The caption is laid out in logical units; cx/cy are pixels.
+        if (Caption.IsOnDragArea(new Point((int)(cx / UiScale), (int)(cy / UiScale)))) return WindowChrome.HTCAPTION;
         return WindowChrome.HTCLIENT;
     }
 
