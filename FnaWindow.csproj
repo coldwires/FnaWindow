@@ -60,12 +60,19 @@
     x86 has no D3D12Core.dll: the D3D12 Agility SDK ships x64 only, so FNA3D falls back to D3D11 on
     a 32-bit build.
   -->
+  <!--
+    Linux gets lib/fnalibs/linux-x64 instead: SDL3, FNA3D, FAudio and Theorafile under the .so names
+    FNA.dll.config maps to. Picked by the runtime identifier when one is given (dotnet publish
+    -r linux-x64), else by the OS doing the build.
+  -->
   <PropertyGroup>
+    <FnaWindowNativeArch Condition="'$(FnaWindowNativeArch)' == '' And $(RuntimeIdentifier.StartsWith('linux'))">linux-x64</FnaWindowNativeArch>
+    <FnaWindowNativeArch Condition="'$(FnaWindowNativeArch)' == '' And '$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</FnaWindowNativeArch>
     <FnaWindowNativeArch Condition="'$(FnaWindowNativeArch)' == ''">x64</FnaWindowNativeArch>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="lib\fnalibs\$(FnaWindowNativeArch)\*.dll">
+    <Content Include="lib\fnalibs\$(FnaWindowNativeArch)\*.dll;lib\fnalibs\$(FnaWindowNativeArch)\*.so*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>%(Filename)%(Extension)</Link>
     </Content>

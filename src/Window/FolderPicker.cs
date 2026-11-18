@@ -11,6 +11,9 @@ namespace FnaWindow;
 /// and the window takes no input while it is open. The answer arrives on the game thread through
 /// <see cref="MainThread"/>: the chosen folder, or null if the user cancelled.
 /// <see cref="FilePicker"/> is the same dialog for files.
+///
+/// Elsewhere it is SDL's dialog, which on Linux is the desktop's own through its file chooser
+/// portal (or zenity where there is none). Call it from the game thread there, as SDL requires.
 /// </summary>
 public static class FolderPicker
 {
@@ -30,6 +33,15 @@ public static class FolderPicker
         (string Name, string Pattern)[]? types, Action<string[]?> done)
     {
         if (Interlocked.Exchange(ref _open, 1) == 1) return;
+        if (!OperatingSystem.IsWindows())
+        {
+            if (!SdlDialog.Show(title, start, folders, multiple, types, picked => { Volatile.Write(ref _open, 0); MainThread.Post(() => done(picked)); }))
+            {
+                Volatile.Write(ref _open, 0);
+                MainThread.Post(() => done(null));
+            }
+            return;
+        }
         var thread = new Thread(() =>
         {
             string[]? picked = null;

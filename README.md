@@ -16,7 +16,7 @@ Building a custom-chrome desktop window normally means fighting the OS. This eng
 - **Runtime theming.** Swap the whole palette while the app runs. Windows 3.1, Midnight, and Slate ship with it, and adding one is a single record literal.
 - **Self-contained.** FNA and its native libraries are vendored under `lib/`, so you can clone and build with no extra setup.
 
-The borderless path is Windows-only. On macOS and Linux the window falls back to the normal OS frame, and the rest of the toolkit works the same.
+On Windows the borderless window is native Win32 (snap, the window menu, Win+Arrow). Elsewhere SDL draws it borderless and hands the caption and edges to the desktop through its hit test, so the window moves, resizes and maximizes there too. Linux natives for x64 are in `lib/fnalibs/linux-x64`, and system fonts come from FreeType and fontconfig.
 
 ## Quick start
 
@@ -159,4 +159,4 @@ Four bitmap-font atlases live in `Content/fonts/`: a proportional MS Sans Serif 
 
 **MIT.** See [LICENSE](LICENSE). You can build closed-source, commercial apps on it.
 
-Vendored third-party components keep their own permissive licenses. FNA (`lib/FNA`) is the Microsoft Public License (Ms-PL); the native libraries in `lib/fnalibs/x64` and `lib/fnalibs/x86` (SDL3, FAudio, FNA3D, Theorafile) are zlib or similar. All of them allow commercial, closed-source distribution as long as you preserve their notices when you ship.
+Vendored third-party components keep their own permissive licenses. FNA (`lib/FNA`) is the Microsoft Public License (Ms-PL); the native libraries in `lib/fnalibs/x64`, `lib/fnalibs/x86` and `lib/fnalibs/linux-x64` (SDL3, FAudio, FNA3D, Theorafile) are zlib or similar. All of them allow commercial, closed-source distribution as long as you preserve their notices when you ship.

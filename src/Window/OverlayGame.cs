@@ -43,6 +43,7 @@ public abstract class OverlayGame : Game
     // before any subclass code runs; a static constructor runs before all of that.
     static OverlayGame()
     {
+        NativeSdl.Install();   // before any of the engine's own SDL calls
         // Showing or raising the window must not take the focus from whatever the user is in.
         Environment.SetEnvironmentVariable("SDL_WINDOW_ACTIVATE_WHEN_SHOWN", "0");
         Environment.SetEnvironmentVariable("SDL_WINDOW_ACTIVATE_WHEN_RAISED", "0");

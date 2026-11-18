@@ -47,6 +47,7 @@ public class WindowGame : Game
     private readonly string _titleText;
     private IntPtr _sdlWindow, _hwnd;
     private bool _borderless, _maximized, _inDraw;
+    private bool _sdlChrome;   // borderless through SdlChrome (not Windows) rather than WindowChrome
 
     // Optional: set env var FNAWINDOW_SHOT=<path> to save a PNG of the window and exit (docs/CI).
     private readonly string? _shotPath = Environment.GetEnvironmentVariable("FNAWINDOW_SHOT");
@@ -89,6 +90,9 @@ public class WindowGame : Game
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, "shot-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png");
     }
+
+    // Before any of the engine's own SDL calls: see NativeSdl.
+    static WindowGame() => NativeSdl.Install();
 
     public WindowGame(string title = "FNA Custom Window", int width = 1024, int height = 768)
     {
@@ -420,6 +424,11 @@ public class WindowGame : Game
                 _borderless = true;
             }
         }
+        else if (SdlChrome.Supported)
+        {
+            _sdlWindow = Window.Handle;
+            _borderless = _sdlChrome = SdlChrome.MakeBorderless(_sdlWindow, WindowHitTest, ToggleMaximize);
+        }
         base.LoadContent();
     }
 
@@ -572,6 +581,17 @@ public class WindowGame : Game
         Root.Update(Input, gameTime);              // widgets may call Root.RequestRedraw()
         ResolveCursor();
         if (_borderless) WindowChrome.EnsureBorderless(_hwnd);
+        // Off Windows FNA raises ClientSizeChanged only for a resize made while the window has
+        // focus, so a size the compositor chose at startup, or one set before the window was focused,
+        // never arrives and the surface stays the old size, resampled into the window: soft text, and
+        // the mouse and hit test measured against the wrong size. Compare the two instead.
+        if (!OperatingSystem.IsWindows() && _resizeSettle == 0 && !_syncingBackBuffer)
+        {
+            var client = Window.ClientBounds;
+            var surface = GraphicsDevice.Viewport;
+            if (client.Width > 0 && client.Height > 0 && (client.Width != surface.Width || client.Height != surface.Height))
+                _resizeSettle = ResizeSettleFrames;
+        }
         // Resync the surface once the resize has SETTLED, never during it - see SyncBackBuffer.
         if (_resizeSettle > 0 && --_resizeSettle == 0) SyncBackBuffer();
         SyncMaximized();                          // snap/Win+Up change it behind our back
@@ -651,6 +671,12 @@ public class WindowGame : Game
     private void ToggleMaximize()
     {
         if (!_borderless) { Graphics.ToggleFullScreen(); Relayout(); return; }
+        if (_sdlChrome)
+        {
+            if (SdlChrome.IsMaximized(_sdlWindow)) SdlChrome.Restore(_sdlWindow);
+            else SdlChrome.Maximize(_sdlWindow);
+            return;
+        }
 
         // Through the OS, not by moving ourselves to the work area. The window is a normal framed
         // window now, so Windows can maximize it too - snap, Win+Up, the taskbar menu - and an
@@ -666,7 +692,7 @@ public class WindowGame : Game
     private void SyncMaximized()
     {
         if (!_borderless) return;
-        bool now = WindowChrome.IsMaximized(_hwnd);
+        bool now = _sdlChrome ? SdlChrome.IsMaximized(_sdlWindow) : WindowChrome.IsMaximized(_hwnd);
         if (now == _maximized) return;
         _maximized = now;
         Caption.Maximized = now;

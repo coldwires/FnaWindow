@@ -10,8 +10,8 @@ namespace FnaWindow;
 /// distinction is load-bearing). Adapted from the fna-desktop-pet interop, but
 /// without the layered/color-key/topmost bits (we're opaque). Also exposes SDL3 helpers to
 /// move/resize the window and read the global cursor so our own title bar can drag it.
-/// Windows-only; on other platforms <see cref="Supported"/> is false and the app keeps its
-/// normal OS frame.
+/// Windows-only; on other platforms <see cref="Supported"/> is false and <see cref="SdlChrome"/>
+/// does the borderless part.
 /// </summary>
 internal static class WindowChrome
 {

@@ -1752,8 +1752,6 @@ static SDL_GPUGraphicsPipeline* SDLGPU_INTERNAL_FetchGraphicsPipeline(
 		&createInfo
 	);
 
-	SDL_stack_free(resourceSetLayoutInfos);
-
 	if (pipeline == NULL)
 	{
 		FNA3D_LogError("Failed to create graphics pipeline!");
@@ -2108,7 +2106,8 @@ static void SDLGPU_SetViewport(
 	{
 		renderer->viewport = *viewport;
 
-		if (renderer->renderPass != NULL)
+		/* A pass waiting to be replaced gets the viewport when the new one begins. */
+		if (renderer->renderPass != NULL && !renderer->needNewRenderPass)
 		{
 			SDLGPU_INTERNAL_UpdateViewport(renderer);
 		}
@@ -2126,7 +2125,7 @@ static void SDLGPU_SetScissorRect(
 		renderer->viewport.w, scissor->w,
 		renderer->viewport.h, scissor->h);
 
-	if (renderer->renderPass != NULL && renderer->fnaRasterizerState.scissorTestEnable)
+	if (renderer->renderPass != NULL && !renderer->needNewRenderPass && renderer->fnaRasterizerState.scissorTestEnable)
 	{
 		SDL_SetGPUScissor(
 			renderer->renderPass,
@@ -2293,7 +2292,7 @@ static void SDLGPU_ApplyRasterizerState(
 	{
 		renderer->fnaRasterizerState.scissorTestEnable = rasterizerState->scissorTestEnable;
 
-		if (renderer->renderPass != NULL)
+		if (renderer->renderPass != NULL && !renderer->needNewRenderPass)
 		{
 			if (renderer->fnaRasterizerState.scissorTestEnable)
 			{

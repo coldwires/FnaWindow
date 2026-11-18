@@ -28,15 +28,17 @@ namespace FnaWindow;
 /// glyphs come out exactly as drawn, identically on every machine. TrueType faces work too and are
 /// rendered with antialiasing off, which is what keeps the 1-bit look.
 ///
-/// Windows only. <see cref="Supported"/> is false elsewhere and callers fall back to a baked atlas.
+/// On Windows this is GDI. Elsewhere FreeType draws the same atlas (BitmapFont.FreeType.cs), where
+/// it is installed. <see cref="Supported"/> is false when neither is there and callers fall back to
+/// a baked atlas.
 /// </summary>
 public sealed partial class BitmapFont
 {
-    public static bool Supported => OperatingSystem.IsWindows();
+    public static bool Supported => OperatingSystem.IsWindows() || FreeType.Available;
 
     /// <summary>
     /// Rasterises <paramref name="family"/> into a font ready to draw with, or null if the family is
-    /// missing, the platform is not Windows, or anything at all goes wrong - callers are expected to
+    /// missing, there is no rasteriser, or anything at all goes wrong - callers are expected to
     /// fall back to a shipped atlas rather than fail.
     /// </summary>
     /// <param name="height">Cell height in pixels. Raster fonts only exist at the sizes baked into
@@ -63,7 +65,12 @@ public sealed partial class BitmapFont
         IReadOnlyList<int>? codepoints = null, bool antialiased = false, IReadOnlyList<string>? fallbacks = null)
     {
         if (!Supported) return null;
-        try { return Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints, antialiased, fallbacks); }
+        try
+        {
+            return OperatingSystem.IsWindows()
+                ? Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints, antialiased, fallbacks)
+                : FreeType.Rasterise(gd, family, height, bold, lineHeight, yOffset, codepoints ?? DefaultCodepoints, antialiased, fallbacks);
+        }
         catch { return null; }
     }
 
@@ -71,7 +78,7 @@ public sealed partial class BitmapFont
     /// Makes a font file the app ships (a .ttf or .otf, say under its Content folder) usable by
     /// <see cref="FromSystemFont"/> and <see cref="HasFamily"/> under its family name, for this
     /// process only: nothing is installed, no other program sees it, and it is gone when the app
-    /// exits. Returns false if the file could not be loaded, or off Windows.
+    /// exits. Returns false if the file could not be loaded.
     ///
     /// For fonts the app is licensed to redistribute (an OFL font, its own): it is the shipped
     /// counterpart to reading the user's own installed faces. Call it before the first
@@ -81,6 +88,7 @@ public sealed partial class BitmapFont
     public static bool AddFontFile(string path)
     {
         if (!Supported || !System.IO.File.Exists(path)) return false;
+        if (!OperatingSystem.IsWindows()) return FreeType.AddFile(path);
         try { return AddFontResourceExW(path, FR_PRIVATE, IntPtr.Zero) > 0; }
         catch { return false; }
     }
@@ -90,6 +98,7 @@ public sealed partial class BitmapFont
     public static bool HasFamily(string family)
     {
         if (!Supported) return false;
+        if (!OperatingSystem.IsWindows()) return FreeType.Has(family);
         IntPtr dc = IntPtr.Zero, font = IntPtr.Zero, prev = IntPtr.Zero;
         try
         {
