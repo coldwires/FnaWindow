@@ -40,6 +40,12 @@ public sealed class TextField
     /// <summary>Face to draw and measure with; null uses the renderer's UI font.</summary>
     public BitmapFont? Font;
 
+    /// <summary>What the caret is drawn in, and how wide. Null is the text colour and one pixel,
+    /// as a 3.1 field has it. An owner that draws the field on its own ground gives it a colour
+    /// that stands out from the ink, and a wider bar at a large text size.</summary>
+    public Color? CaretColor;
+    public int CaretWidth = 1;
+
     /// <summary>Raised whenever the text changes, including a paste or a delete.</summary>
     public Action<string>? Changed;
 
@@ -217,7 +223,7 @@ public sealed class TextField
         if (Focused && _caretOn && !ReadOnly)
         {
             int cx = baseX + font.MeasureWidth(_text.Substring(0, _caret));
-            if (cx >= view.X && cx <= view.Right) r.Fill(cx, ty, 1, font.LineHeight, Theme.Text);
+            if (cx >= view.X && cx <= view.Right) r.Fill(cx, ty, Math.Max(1, CaretWidth), font.LineHeight, CaretColor ?? Theme.Text);
         }
     }
 
